@@ -10,7 +10,7 @@ module Arrangement
 
 	LA = LinearAlgebra
 
-    # include("./minimal_cycles.jl")
+    include("./minimal_cycles.jl")
     # include("./dimension_travel.jl")
     include("./planarArrangement.jl")
     # include("./spatial_arrangement.jl")

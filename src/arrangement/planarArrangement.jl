@@ -280,7 +280,6 @@ function merge_vertices!(
     # return new vertices and new edges
     model.G = convert(Lar.Points, nV')
     model.T[1] = nEV
-    model.n = size(model.G, 2)
     return
 end
 
@@ -391,13 +390,13 @@ See also:
 # Examples
 ```jldoctest
 julia> copEV = SparseArrays.sparse(Array{Int8, 2}([
-    [1 1 0 0 0 0] #1 -> 1,2  |
-    [1 0 1 0 0 0] #2 -> 1,3  |
-    [1 0 0 1 0 0] #3 -> 1,4   |
-    [1 0 0 0 1 0] #4 -> 1,5   |
-    [1 0 0 0 0 1] #5 -> 1,6
-    [0 1 1 0 0 0] #6 -> 2,3  |
-    [0 0 0 1 1 0] #7 -> 4,5   |
+        [1 1 0 0 0 0] #1 -> 1,2  |
+        [1 0 1 0 0 0] #2 -> 1,3  |
+        [1 0 0 1 0 0] #3 -> 1,4   |
+        [1 0 0 0 1 0] #4 -> 1,5   |
+        [1 0 0 0 0 1] #5 -> 1,6
+        [0 1 1 0 0 0] #6 -> 2,3  |
+        [0 0 0 1 1 0] #7 -> 4,5   |
     ]));
 julia> LarA.biconnected_components(copEV)
 2-element Array{Array{Int64,1},1}:
@@ -407,9 +406,9 @@ julia> LarA.biconnected_components(copEV)
 
 ```jldoctest
 julia> copEV = SparseArrays.sparse(Array{Int8, 2}([
-    [1 1 0] #1 -> 1,2  |
-    [1 1 0] #2 -> 1,2  |
-    [1 0 1] #3 -> 1,2
+        [1 1 0] #1 -> 1,2  |
+        [1 1 0] #2 -> 1,2  |
+        [1 0 1] #3 -> 1,2
     ]));
 julia> LarA.biconnected_components(copEV)
 1-element Array{Array{Int64,1},1}:
@@ -628,7 +627,7 @@ julia> LarA.pre_containment_test(bboxes)
 ```
 """
 function pre_containment_test(
-        bboxes::Array{Tuple{Array{Float64,2},Array{Float64,2}},1}
+        bboxes#::Array{Tuple{Array{Float64,2},Array{Float64,2}},1}              #
     )
     n = length(bboxes)
     containment_graph = spzeros(Int8, n, n)
@@ -837,7 +836,7 @@ function componentgraph(V, copEV, bicon_comps)
 	boundaries = Array{Lar.ChainOp, 1}(undef, n)
 	EVs = Array{Lar.ChainOp, 1}(undef, n)
     # for each component
-	for p in 1:n
+	for p in 1 : n
 		ev = copEV[sort(bicon_comps[p]), :]
         # computation of 2-cells
 		fe = Lar.Arrangement.minimal_2cycles(V, ev)
@@ -997,7 +996,7 @@ julia> edge_map
 """
 function planar_arrangement_1(
         model::Lar.Model,
-		sigma::Lar.Chain = nothing,
+		sigma::Lar.Chain = spzeros(Int8, 0),
 		return_edge_map::Bool = false,
 		multiproc::Bool = false
     )
@@ -1065,10 +1064,11 @@ function planar_arrangement_1(
         return model, sigmaN, edge_map
     else
         return model, sigmaN
+    end
 end
 
 """
-	function planar_arrangement_2(model, [bicon_comps], [edge_map])
+	planar_arrangement_2(model, [bicon_comps], [edge_map])
 
 Second part of arrangement's algorithmic pipeline.
 
@@ -1116,10 +1116,10 @@ function planar_arrangement_2(
         model::Lar.Model,
         bicon_comps,                                                            ##
         edge_map,                                                               ##
-    )
+    )::Lar.Model
 
     edges = sort(union(bicon_comps...))
-    todel = sort(setdiff(collect(1:size(copEV, 1)), edges))
+    todel = sort(setdiff(collect(1:size(model.T[1], 1)), edges))
 
     for i in reverse(todel)
         for row in edge_map
@@ -1134,17 +1134,25 @@ function planar_arrangement_2(
         end
     end
 
-
-	bicon_comps = Lar.Arrangement.biconnected_components(copEV)                 ## ???
+    # test to remove
+    @assert isequal(
+        bicon_comps,
+        Lar.Arrangement.biconnected_components(model.T[1])
+    )
 
 	# component graph
 	n, containment_graph, V, EVs, boundaries, shells, shell_bboxes =
-        Lar.Arrangement.componentgraph(V, copEV, bicon_comps)
+        Lar.Arrangement.componentgraph(
+            convert(Lar.Points, model.G'), model.T[1], bicon_comps
+        )
 
 	copEV, FE = Lar.Arrangement.cell_merging(
 	   	n, containment_graph, V, EVs, boundaries, shells, shell_bboxes)
 
-	return V,copEV,FE
+    model = Lar.Model(convert(Lar.Points, V'));
+    model.T[1] = copEV;
+    model.T[2] = FE;
+	return model
 end
 
 
@@ -1184,14 +1192,13 @@ It uses:
 """
 function planar_arrangement(
         model::Lar.Model,
-        sigma::Lar.Chain=nothing,                                               ## TEST
-        return_edge_map::Bool=false,
-        multiproc::Bool=false
-    )::Union{Lar.Model, Tuple{Lar.model, Array{Array{Int, 1}, 1}}}
+        sigma::Lar.Chain = spzeros(Int8, 0),                                    ## TEST
+        return_edge_map::Bool = false,
+        multiproc::Bool = false
+    )::Union{Lar.Model, Tuple{Lar.Model, Array{Array{Int, 1}, 1}}}
 
     # Check dimensional condition
-    Lar.checkModel(model);
-    @assert model.dim == 2;
+    @assert length(model) == 2;
 
     # Chek multiprocessing
     if multiproc && Distributed.nprocs() <= 1
@@ -1201,10 +1208,10 @@ function planar_arrangement(
 
     #planar_arrangement_1
 	model, sigma, edge_map =
-        Lar.planar_arrangement_1(model, sigma, true, multiproc)
+        LarA.planar_arrangement_1(model, sigma, true, multiproc)
 
     # cleandecomposition
-	if !isnothing(sigma)
+	if !isempty(sigma)
 		model = Lar.Arrangement.cleandecomposition(model, sigma, edge_map)      ## TODO
 	end
 

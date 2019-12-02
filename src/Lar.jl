@@ -7,7 +7,7 @@ module Lar
 	using SparseArrays
 	using LinearAlgebra
 	#using Distributed
-	import Base.+
+	import Base: +, length, size
 
 #	Lar = Lar;
 
@@ -88,14 +88,13 @@ module Lar
 	const LARmodel = Tuple{Points,Array{Cells,1}}
 
 	mutable struct Model
-		n::UInt32
-		dim::UInt8
 		G::Points
 		T::Array{ChainOp, 1}
 
 		function Model(V::Points)
-			dim, n = size(V);
-			new(n, dim, V, Array{ChainOp, 1}(undef, dim))
+			size(V, 1) > 0 ||
+				throw(ArgumentError("At least one point is needed."))
+			new(V, Array{ChainOp, 1}(undef, size(V, 1)))
 		end
 
 		function Model()
@@ -103,7 +102,11 @@ module Lar
 		end
 	end
 
-	function +(m1::Lar.Model, m2::Lar.Model)
+	# Basic Properties
+	length(m::Lar.Model)	= size(m.G, 1)
+	size(m::Lar.Model)		= size(m.G)
+
+	#==function +(m1::Lar.Model, m2::Lar.Model)
 		if m1.dim > m2.dim
 			V1 = m1.G
 			mdiff = m1.dim - m2.dim
@@ -125,8 +128,19 @@ module Lar
 		for i = 1 : m.dim
 			@assert !isdefined(m.T, i) || length(m.T[i]) == n;
 		end
-	end
+	end==#
 
+	function addVertex!(m::Lar.Model, v::Array{Float64, 1})
+		length(V) == length(v) ||
+			throw(ArgumentError("Point dimension mismatch."))
+		m.G = [m.G v];
+	end
+	#==function removeVertex!(m::Lar.Model, v::Array{Float64, 1})
+		toRemove = [isequal(m.G[:, i], v) for i = 1 : size(m, 2)]
+		toHold = [!isequal(m.G[:, i], v) for i = 1 : size(m, 2)]
+		m.G = m.G[:, toHold]
+
+	end==#
 
 	"""
 		LAR = Union{ Tuple{Points, Cells},Tuple{Points, Cells, Cells} }
