@@ -42,7 +42,11 @@ function frag_edge_channel(
 end
 
 """
-    frag_edge(model::Lar.Model, edge_idx::Int, bigPI::Array)
+    frag_edge(
+        model::Lar.Model,
+        edge_idx::Int,
+        bigPI::Array{Array{Int64,1},1}
+    )::Tuple{Lar.Points, Lar.ChainOp}
 
 Splits the `edge_idx`-th edge of the Edge Topology `model.T[1]`.
 
@@ -63,7 +67,7 @@ julia> model = Lar.Model(hcat([
     [1.0, 0.0], [0.0, 1.0], [0.0, 0.5], [0.5, 1.0], [1.0, 1.0]
 ]...));
 julia> model.T[1] = Lar.coboundary_0([[1, 2], [2, 5], [3, 4], [4, 5]]);
-julia> bigPI = Lar.spaceindex((V, EV));
+julia> bigPI = Lar.spaceindex((model.G, Lar.cop2lar(model.T[1])));
 julia> LarA.frag_edge(model, 1, bigPI)[1]
 4×2 Array{Float64,2}:
  1.0   0.0
@@ -111,11 +115,17 @@ end
 
 
 """
-    intersect_edges(V::Lar.Points, edge1::Lar.Cell, edge2::Lar.Cell)
+    intersect_edges(
+        V::Lar.Points,
+        edge1::Lar.Cell,
+        edge2::Lar.Cell
+    )::Array{Tuple{Lar.Points, Float64}, 1}
 
-Finds the intersection points (if there exists) between the two given edges.
+Finds the intersection points (if there exist) between the two given edges.
 
 Compute the new points over `edge1` given by the intersection with `edge2`.
+For each intersection point it evaluates the scalar corresponding to the
+relative distance from the first vertex of the edge.
 Note that vertices of `edge1` are therefore never detected (see example 2).
 
 See also: [`Lar.Arrangement.frag_edge`](@ref)
@@ -142,7 +152,12 @@ julia> Lar.Arrangement.intersect_edges(V, copEV[2, :], copEV[1, :])
 0-element Array{Tuple{Array{T,2} where T,Float64},1}
 ```
 """
-function intersect_edges(V::Lar.Points, edge1::Lar.Cell, edge2::Lar.Cell)
+function intersect_edges(
+        V::Lar.Points,
+        edge1::Lar.Cell,
+        edge2::Lar.Cell
+    )::Array{Tuple{Lar.Points, Float64}, 1}
+
     err = 10e-8
 
     x1, y1, x2, y2 = vcat(map(c->V[c, :], edge1.nzind)...)
@@ -184,7 +199,7 @@ end
 """
 merge_vertices!(
     model::Lar.model,
-    [ edge_map::Array{Array{Int64,1},1} = [[-1]] ],
+    [ edge_map::Array{Array{Int64,1},1} = Array{Array{Int64,1},1}() ],
     [ err::Float64 = 1e-4 ]
 )::Nothing
 
@@ -223,7 +238,7 @@ julia> model.T[1]
 """
 function merge_vertices!(
         model::Lar.Model,
-        edge_map::Array{Array{Int64,1},1} = [[-1]],
+        edge_map::Array{Array{Int64,1},1} = Array{Array{Int64,1},1}(),
         err::Float64 = 1e-4
     )::Nothing
     V = convert(Lar.Points, model.G')
@@ -268,7 +283,7 @@ function merge_vertices!(
         nEV[ei, collect(nedges[ei])] .= 1
         etuple2idx[nedges[ei]] = ei
     end
-    if edge_map != [[-1]]
+    if !isempty(edge_map)
         for i in 1:length(edge_map)
             row = edge_map[i]
             row = map(x->edges[x], row)
@@ -289,15 +304,20 @@ end
 #-------------------------------------------------------------------------------
 
 """
-    cleandecomposition(model, sigma, edge_map)
-
-                                                                                ## TODO
+    cleandecomposition(
+        model::Lar.Model,
+        sigma::Union{Lar.Chain, Array{Int,1}},
+        [ edge_map::Array{Array{Int64,1},1} = Array{Array{Int64,1},1}() ]
+    )
 
 This function clears the `model` from all edges outside ``σ``.
 
-This function takes a `Lar.Chain` ``σ`` and drops all the edges from
-the topology `model.T[1]` that are outside from ``σ``.
-gives back the dropped model and and a vector `todel` of the 2-cells to drop.
+This function take an arranged-edge `model` and a `Lar.Chain` ``σ`` made of
+edges indices of the 1-chains `model.T[1]`.
+The method drops from the Topology all the edges that are outside ``σ`` and
+gives back the dropped model.
+If an `edge_map` is given as an input it is also purged from the edges outside
+w.r.t. ``σ`` and it is given as an output as well.
 
 See also: [`Lar.planar_arrangement`](@ref)
 ---
@@ -322,32 +342,51 @@ julia> copEV = SparseArrays.sparse(Array{Int8, 2}([
     [0 0 0 0 0 0 0 1 1] #9 -> 8,9
     ]));
 
-julia> σ = SparseArrays.sparse([0; 0; 0; 1; 1; 1; 0; 0; 0]);
+julia> σ = SparseArrays.sparse([1; 1; 1; 0; 0; 0; 0; 0; 0]);
 
 todel, V, copEV = LarA.cleandecomposition(V, copEV, convert(Lar.Chain, σ))
 
 Plasm.view(convert(Lar.Points, V'), Lar.cop2lar(copEV));
 ```
 """
-function cleandecomposition(V, copEV, sigma, edge_map)
-    # Deletes edges outside sigma area
-    todel = []
-    new_edges = []
-    map(i->new_edges=union(new_edges, edge_map[i]), sigma.nzind)
-    ev = copEV[new_edges, :]
-    for e in 1:copEV.m
-        if !(e in new_edges)
+function cleandecomposition(
+        model::Lar.Model,
+        sigma::Union{Lar.Chain, Array{Int,1}},
+        edge_map::Array{Array{Int64,1},1} = Array{Array{Int64,1},1}()
+    )::Union{Lar.Model, Tuple{Lar.Model, Array{Array{Int64,1},1}}}
 
-            vidxs = copEV[e, :].nzind
-            v1, v2 = map(i->V[vidxs[i], :], [1,2])
+    new_model = copy(model)
+
+    # Model point extraction to use Lar.point_in_face                           ##
+    V = convert(Lar.Points, new_model.G')
+
+    if issparse(sigma)
+        sigma = sigma.nzind
+    end
+    todel = Array{Int,1}()
+    sigma_edges = new_model.T[1][sigma, :]
+    for e in 1:new_model.T[1].m
+        # Since the model is already arranged an edge can only be a sigma-edge,
+        #  an intersection-free innner edge w.r.t. sigma face (not to purge),
+        #  or an intersection-free outer edge (has to be deleted).
+        if !(e in sigma)
+            v1, v2 = Lar.getModelEdgeVertices(new_model, e)
             centroid = .5*(v1 + v2)
 
-            if ! Lar.point_in_face(centroid, V, ev)
+            if ! Lar.point_in_face(centroid, V, sigma_edges)
                 push!(todel, e)
             end
         end
     end
 
+    Lar.deleteModelEdges!(new_model, todel)
+
+    if isempty(edge_map)
+        return new_model
+    end
+
+    # Edges in edge_map must be updated too according to the same approach
+    #  edges are deleted from models.
     for i in reverse(todel)
         for row in edge_map
 
@@ -360,9 +399,7 @@ function cleandecomposition(V, copEV, sigma, edge_map)
             end
         end
     end
-
-    V, copEV = Lar.delete_edges(todel, V, copEV)
-	return V,copEV
+	return new_model, edge_map
 end
 
 #-------------------------------------------------------------------------------
@@ -999,7 +1036,12 @@ function planar_arrangement_1(
 		sigma::Lar.Chain = spzeros(Int8, 0),
 		return_edge_map::Bool = false,
 		multiproc::Bool = false
-    )
+    )::Union{
+        Lar.Model,
+        Tuple{Lar.Model, Array{Array{Int64,1},1}},
+        Tuple{Lar.Model, Array{Int,1}},
+        Tuple{Lar.Model, Array{Int,1}, Array{Array{Int64,1},1}}
+    }
 	# data structures initialization
     # V = convert(Lar.Points, model.G')
     # copEV = model.T[1]
@@ -1053,17 +1095,27 @@ function planar_arrangement_1(
             rV, rEV = Lar.skel_merge(rV, rEV, v, ev)
         end
     end
+
     # merging of close vertices and edges (2D congruence)
     model = Lar.Model(convert(Lar.Points, rV'))
     model.T[1] = rEV
     LarA.merge_vertices!(model, edge_map)
-    if !isnothing(sigma)
-        sigmaN = sigma                                                          ## TODO
+
+    if isempty(sigma)
+        if return_edge_map
+            return model, edge_map
+        else
+            return model
+        end
     end
+
+    # Sigma update by mapping each of its edges into newly born edges
+    new_sigma = Array{Int,1}()
+    map(i->new_sigma=union(new_sigma, edge_map[i]), sigma.nzind)
     if return_edge_map
-        return model, sigmaN, edge_map
+        return model, new_sigma, edge_map
     else
-        return model, sigmaN
+        return model, new_sigma
     end
 end
 
@@ -1212,7 +1264,8 @@ function planar_arrangement(
 
     # cleandecomposition
 	if !isempty(sigma)
-		model = Lar.Arrangement.cleandecomposition(model, sigma, edge_map)      ## TODO
+		model, edge_map =
+            Lar.Arrangement.cleandecomposition(model, sigma, edge_map)
 	end
 
     bicon_comps = Lar.Arrangement.biconnected_components(model.T[1])
