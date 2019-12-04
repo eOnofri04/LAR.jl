@@ -34,9 +34,10 @@ end
 #   BASIC PROPERTIES
 #-------------------------------------------------------------------------------
 
-length(m::Lar.Model)    = size(m.G, 1)
-size(m::Lar.Model)		= size(m.G)
-Base.copy(m::Lar.Model) = Lar.Model(m.G, m.T)
+length(m::Lar.Model)        = size(m.G, 1)
+size(m::Lar.Model)		    = size(m.G)
+Base.copy(m::Lar.Model)     = Lar.Model(m.G, m.T)
+Base.deepcopy(m::Lar.Model) = Lar.Model(Base.deepcopy(m.G), Base.deepcopy(m.T))
 
 #==function +(m1::Lar.Model, m2::Lar.Model)
     if m1.dim > m2.dim

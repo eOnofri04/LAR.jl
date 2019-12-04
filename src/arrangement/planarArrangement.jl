@@ -355,22 +355,22 @@ function cleandecomposition(
         edge_map::Array{Array{Int64,1},1} = Array{Array{Int64,1},1}()
     )::Union{Lar.Model, Tuple{Lar.Model, Array{Array{Int64,1},1}}}
 
-    new_model = copy(model)
-
+    model = deepcopy(model)
+    edge_map = deepcopy(edge_map)
     # Model point extraction to use Lar.point_in_face                           ##
-    V = convert(Lar.Points, new_model.G')
+    V = convert(Lar.Points, model.G')
 
     if issparse(sigma)
         sigma = sigma.nzind
     end
     todel = Array{Int,1}()
-    sigma_edges = new_model.T[1][sigma, :]
-    for e in 1:new_model.T[1].m
+    sigma_edges = model.T[1][sigma, :]
+    for e in 1:model.T[1].m
         # Since the model is already arranged an edge can only be a sigma-edge,
         #  an intersection-free innner edge w.r.t. sigma face (not to purge),
         #  or an intersection-free outer edge (has to be deleted).
         if !(e in sigma)
-            v1, v2 = Lar.getModelEdgeVertices(new_model, e)
+            v1, v2 = Lar.getModelEdgeVertices(model, e)
             centroid = .5*(v1 + v2)
 
             if ! Lar.point_in_face(centroid, V, sigma_edges)
@@ -379,10 +379,10 @@ function cleandecomposition(
         end
     end
 
-    Lar.deleteModelEdges!(new_model, todel)
+    Lar.deleteModelEdges!(model, todel)
 
     if isempty(edge_map)
-        return new_model
+        return model
     end
 
     # Edges in edge_map must be updated too according to the same approach
@@ -399,7 +399,7 @@ function cleandecomposition(
             end
         end
     end
-	return new_model, edge_map
+	return model, edge_map
 end
 
 #-------------------------------------------------------------------------------
@@ -1118,6 +1118,10 @@ function planar_arrangement_1(
         return model, new_sigma
     end
 end
+
+#-------------------------------------------------------------------------------
+#   PLANAR ARRANGEMENT PIPELINE - PART 2
+#-------------------------------------------------------------------------------
 
 """
 	planar_arrangement_2(model, [bicon_comps], [edge_map])
