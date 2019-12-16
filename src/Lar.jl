@@ -7,9 +7,6 @@ module Lar
 	using SparseArrays
 	using LinearAlgebra
 	#using Distributed
-	import Base: +, length, size
-
-#	Lar = Lar;
 
 	"""
 		Points = Array{Number,2}

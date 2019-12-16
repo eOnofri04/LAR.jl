@@ -1,6 +1,4 @@
-#using Lar
-#Lar = Lar;
-LarA = Lar.Arrangement;
+LarA = Lar.Arrangement
 
 #-------------------------------------------------------------------------------
 #   PLANAR ARRANGEMENT PIPELINE - PART 1 METHODS
@@ -164,9 +162,9 @@ function intersect_edges(
     x3, y3, x4, y4 = vcat(map(c->V[c, :], edge2.nzind)...)
     ret = Array{Tuple{Lar.Points, Float64}, 1}()
 
-    v1 = [x2-x1, y2-y1];
-    v2 = [x4-x3, y4-y3];
-    v3 = [x3-x1, y3-y1];
+    v1 = [x2-x1, y2-y1]
+    v2 = [x4-x3, y4-y3]
+    v3 = [x3-x1, y3-y1]
     ang1 = dot(LA.normalize(v1), LA.normalize(v2))
     ang2 = dot(LA.normalize(v1), LA.normalize(v3))
     parallel = 1-err < abs(ang1) < 1+err
@@ -380,6 +378,7 @@ function cleandecomposition(
     end
 
     Lar.deleteModelEdges!(model, todel)
+    Lar.modelPurge(model, 0)
 
     if isempty(edge_map)
         return model
@@ -550,6 +549,52 @@ function biconnected_components(EV::Lar.ChainOp)
     return bicon_comps
 end
 
+
+#-------------------------------------------------------------------------------
+#   PLANAR ARRANGEMENT PIPELINE - REMOVE MAPPING DANGLING EDGES
+#-------------------------------------------------------------------------------
+
+"""
+    remove_mapping_dangling_edges(
+        edge_map::Array{Array{Int64,1},1},
+        bicon_comps::Array{Array{Int64,1},1}
+    )::Array{Array{Int64,1},1}
+
+Remove from the edge_map the edges not belonging to a biconnected component.
+
+This utility function deletes from the `edge_map` all the edges that do not
+belongs to a biconnected component by ordinatelly recompatting the indices of
+the remaning edges.
+
+See also: [`Lar.Arrangement.planar_arrangement`](@ref).
+"""
+function remove_mapping_dangling_edges(
+        edge_map::Array{Array{Int64,1},1},
+        bicon_comps::Array{Array{Int64,1},1}
+    )::Array{Array{Int64,1},1}
+
+    edge_map = deepcopy(edge_map)
+
+    edges = sort(union(bicon_comps...))
+                                  #size(model.T[1, 1]) == max(edge_map...)
+    todel = sort(setdiff(collect(1:max(max(edge_map...)...)), edges))
+
+    for i in reverse(todel)
+        for row in edge_map
+
+            filter!(x->x!=i, row)
+
+            for j in 1:length(row)
+                if row[j] > i
+                    row[j] -= 1
+                end
+            end
+        end
+    end
+
+    return edge_map
+end
+
 #-------------------------------------------------------------------------------
 #   PLANAR ARRANGEMENT PIPELINE - PART 2 - COMPONENT GRAPH (TGW) METHODS
 #    get_external_cycle
@@ -559,12 +604,14 @@ end
 #-------------------------------------------------------------------------------
 
 """
-    get_external_cycle(model::Lar.Model)
+    get_external_cycle(model::Lar.Model)::Union{Int64, Nothing}
+    get_external_cycle(V::Lar.Points, EV::Lar.ChainOp, FE::Lar.ChainOp)
 
-Evaluates the index of the external 3D-cell.
+Evaluates the index of the external 3D-cell of a Topological Model.
 
 This method looks for and retrieve the external cycle of the `model`.
-If the cell does not exist then it return a `Nothing` element.
+If the cell does not exist then it returns `nothing`.
+The method is also callable by the signature `(V, EV, FE)`.
 
 See also: [`Lar.Arrangement.componentgraph`](@ref).
 ---
@@ -595,8 +642,22 @@ julia> typeof(LarA.get_external_cycle(model))
 Nothing
 ```
 """
-function get_external_cycle(V::Lar.Points, EV::Lar.ChainOp, FE::Lar.ChainOp)::Int64
+function get_external_cycle(model::Lar.Model)::Union{Int64, Nothing}
+    LarA.get_external_cycle(
+        convert(Lar.Points, model.G'),
+        model.T[1],
+        model.T[2]
+    )
+end
+
+function get_external_cycle(
+        V::Lar.Points,
+        EV::Lar.ChainOp,
+        FE::Lar.ChainOp
+    )::Union{Int64, Nothing}
+
     FV = abs.(FE)*EV
+
     vs = sparsevec(mapslices(sum, abs.(EV), dims=1)').nzind
     minv_x1 = maxv_x1 = minv_x2 = maxv_x2 = pop!(vs)
     for i in vs
@@ -631,7 +692,7 @@ end
 """
     pre_containment_test(
         bboxes::Array{Tuple{Array{Float64,2},Array{Float64,2}},1}
-    )
+    )::SparseMatrixCSC{Int8,Int64}
 
 Generate the containment graph associated to `bboxes`.
 
@@ -665,7 +726,7 @@ julia> LarA.pre_containment_test(bboxes)
 """
 function pre_containment_test(
         bboxes#::Array{Tuple{Array{Float64,2},Array{Float64,2}},1}              #
-    )
+    )::SparseMatrixCSC{Int8,Int64}
     n = length(bboxes)
     containment_graph = spzeros(Int8, n, n)
 
@@ -681,40 +742,56 @@ function pre_containment_test(
 end
 
 """
-    prune_containment_graph(n, V, EVs, shells, graph)
+    prune_containment_graph(
+            V::Lar.Points,
+            EVs::Array{Lar.ChainOp, 1},
+            shells::Array{Lar.Chain,1},
+            graph::SparseMatrixCSC{Int8, Int64}
+        )::SparseMatrixCSC{Int8, Int64}
 
 Prunes the containment `graph` from the non-included faces.
 
 This method prunes the containment graph eliminating the included bouning boxes
-that not corresponds to included faces.
+that do not corresponds to included faces.
 
 Do note that this method expects to work on biconnectet clusters of faces.
 
 See also: [`Lar.Arrangement.componentgraph`](@ref).
 ```
 """
-function prune_containment_graph(n, V, EVs, shells, graph)
+function prune_containment_graph(
+        V::Lar.Points,
+        EVs::Array{Lar.ChainOp, 1},
+        shells::Array{Lar.Chain,1},
+        graph::SparseMatrixCSC{Int8, Int64}
+    )::SparseMatrixCSC{Int8, Int64}
 
-    for i in 1:n
+    graph = deepcopy(graph) # copy needed
+    n = length(EVs)
+    length(shells) == n || throw(ArgumentError("EVs and shells not coherent"))
+    size(graph) == (n, n) || throw(ArgumentError("graph dim not coherent"))
+
+    for i in 1 : n
+        # Take a point of the i-th shell by taking a vertex of its first edge
         an_edge = shells[i].nzind[1]
         origin_index = EVs[i][an_edge, :].nzind[1]
         origin = V[origin_index, :]
 
-        for j in 1:n
-            if i != j
-                if graph[i, j] == 1
-                    shell_edge_indexes = shells[j].nzind
-                    ev = EVs[j][shell_edge_indexes, :]
+        # Check the containment for every other cell by testing if such a point
+        #   is inner to the face defined byt that cell
+        for j in 1 : n
+            if i != j && graph[i, j] == 1
+                shell_edge_indexes = shells[j].nzind
+                ev = EVs[j][shell_edge_indexes, :]
 
-                    if !Lar.point_in_face(origin, V, ev)
-                        graph[i, j] = 0
-                    end
+                if !Lar.point_in_face(origin, V, ev)
+                    graph[i, j] = 0
                 end
-             end
+            end
          end
 
      end
-     return graph
+     return dropzeros(graph)
 end
 
 """
@@ -876,9 +953,9 @@ function componentgraph(V, copEV, bicon_comps)
 	for p in 1 : n
 		ev = copEV[sort(bicon_comps[p]), :]
         # computation of 2-cells
-		fe = Lar.Arrangement.minimal_2cycles(V, ev)
+		fe = LarA.minimal_2cycles(V, ev)
         # exterior cycle
-		shell_num = Lar.Arrangement.get_external_cycle(V, ev, fe)
+		shell_num = LarA.get_external_cycle(V, ev, fe)
         # decompose each fe (co-boundary local to component)
 		EVs[p] = ev
 		tokeep = setdiff(1:fe.m, shell_num)
@@ -893,9 +970,7 @@ function componentgraph(V, copEV, bicon_comps)
 	end
     # computation and reduction of containment graph
 	containment_graph = pre_containment_test(shell_bboxes)
-	containment_graph = prune_containment_graph(
-        n, V, EVs, shells, containment_graph
-    )
+	containment_graph = prune_containment_graph(V,EVs,shells,containment_graph)
 	transitive_reduction!(containment_graph)
 	return n, containment_graph, V, EVs, boundaries, shells, shell_bboxes
 end
@@ -921,7 +996,7 @@ function cell_merging(
         boxes
     end
     # initiolization
-    sums = Array{Tuple{Int, Int, Int}}(undef, 0);
+    sums = Array{Tuple{Int, Int, Int}}(undef, 0)
     # assembling child components with father components
     for father in 1:n
         if sum(containment_graph[:, father]) > 0
@@ -976,9 +1051,9 @@ end
 """
 	planar_arrangement_1(
         model::Lar.Model,
-        [sigma],
-        [return_edge_map],
-        [multiproc]
+        [sigma::Lar.Chain = spzeros(Int8, 0)],
+        [return_edge_map::Bool = false],
+        [multiproc::Bool = false]
     )
 
 First part of arrangement's algorithmic pipeline.
@@ -1124,16 +1199,19 @@ end
 #-------------------------------------------------------------------------------
 
 """
-	planar_arrangement_2(model, [bicon_comps], [edge_map])
+	planar_arrangement_2(
+        model::Lar.Model,
+        bicon_comps::{Array{Array,1},1}
+    )::Lar.Model
 
 Second part of arrangement's algorithmic pipeline.
 
-This function is the complete Topological Gift Wrapping (TGW) algorithm that is firstly
-locally used in order to decompose the 2-cells and then globally to generate the 3-cells
-of the arrangement of the ambient space ``E^3``.
+This function is the complete Topological Gift Wrapping (TGW) algorithm that
+is firstly locally used in order to decompose the 2-cells and then globally
+to generate the 3-cells of the arrangement of the ambient space ``E^3``.
 
-During this process each dangling 2-cell is removed.
-Do note that the isolated 1-cells are not removed by this procedure.
+During this process each dangling 1-cell is removed.
+Do note that the isolated 2-cells are not removed by this procedure.
 
 See also: [`Lar.planar_arrangement`](@ref) for the complete pipeline.
 It uses:
@@ -1145,69 +1223,53 @@ It uses:
 # Examples
 ```jldoctest
 # Triforce
-julia> model = Lar.Model(hcat([
-    [0.0, 0.0],[2.0, 0.0],[4.0, 0.0],[1.0, 1.5],[3.0, 1.5],[2.0, 3.0],[3.0, 3.0]
-    ]...));
-julia> model.T[1] = SparseArrays.sparse(Array{Int8, 2}([
-    [1 1 0 0 0 0 0] #1 -> 1,2
-    [0 1 1 0 0 0 0] #2 -> 2,3
-    [1 0 0 1 0 0 0] #3 -> 1,4
-    [0 0 0 1 0 1 0] #4 -> 4,6
-    [0 0 1 0 1 0 0] #5 -> 3,5
-    [0 0 0 0 1 1 0] #6 -> 5,6
-    [0 1 0 1 0 0 0] #7 -> 2,4
-    [0 1 0 0 1 0 0] #8 -> 2,5
-    [0 0 0 1 1 0 0] #9 -> 4,5
-    [0 0 0 0 0 1 1]
-    ]));
+julia> model = Lar.Model([
+    0.0 0 2 0 0 1 4 4 3 2 4 4
+    0.0 2 0 3 4 4 2 0 0 4 4 2
+]);
+
+julia> model.T[1] = abs.(Lar.coboundary_0([
+    [ 1,  2], [ 2,  3], [ 3,  1],
+    [ 4,  5], [ 5,  6], [ 6,  7], [ 7,  8], [ 8,  9], [ 9, 4],
+    [10, 11], [11, 12], [12, 10]
+]))
 
 julia> bicon_comps = Lar.Arrangement.biconnected_components(model.T[1])
-1-element Array{Array{Int64,1},1}:
- [8, 9, 7, 3, 4, 6, 5, 2, 1]
+3-element Array{Array{Int64,1},1}:
+ [9, 8, 7, 6, 5, 4]
+ [3, 2, 1]
+ [12, 11, 10]
 
-julia> V, EV, FE = Lar.Arrangement.planar_arrangement_2(model, bicon_comps);    ##Add numbering view
+julia> model = Lar.Arrangement.planar_arrangement_2(model, bicon_comps);    ##Add numbering view
 ```
 """
 function planar_arrangement_2(
         model::Lar.Model,
-        bicon_comps,                                                            ##
-        edge_map,                                                               ##
+        bicon_comps::Array{Array{Int64,1},1}
     )::Lar.Model
 
-    edges = sort(union(bicon_comps...))
-    todel = sort(setdiff(collect(1:size(model.T[1], 1)), edges))
-
-    for i in reverse(todel)
-        for row in edge_map
-
-            filter!(x->x!=i, row)
-
-            for j in 1:length(row)
-                if row[j] > i
-                    row[j] -= 1
-                end
-            end
-        end
-    end
-
-    # test to remove
+    #==
+    test to remove
     @assert isequal(
         bicon_comps,
-        Lar.Arrangement.biconnected_components(model.T[1])
+        LarA.biconnected_components(model.T[1])
     )
+    ==#
 
 	# component graph
 	n, containment_graph, V, EVs, boundaries, shells, shell_bboxes =
-        Lar.Arrangement.componentgraph(
+        LarA.componentgraph(
             convert(Lar.Points, model.G'), model.T[1], bicon_comps
         )
 
-	copEV, FE = Lar.Arrangement.cell_merging(
-	   	n, containment_graph, V, EVs, boundaries, shells, shell_bboxes)
+	copEV, FE = LarA.cell_merging(
+	   	n, containment_graph, V, EVs, boundaries, shells, shell_bboxes
+    )
 
-    model = Lar.Model(convert(Lar.Points, V'));
-    model.T[1] = copEV;
-    model.T[2] = FE;
+    model = Lar.Model(convert(Lar.Points, V'))
+    model.T[1] = copEV
+    model.T[2] = FE
+    Lar.modelPurge!(model)
 	return model
 end
 
@@ -1237,6 +1299,7 @@ It uses:
  - [`Lar.Arrangement.planar_arrangement_1`](@ref)
  - [`Lar.Arrangement.cleandecomposition`](@ref)
  - [`Lar.Arrangement.biconnected_components`](@ref)
+ - [`Lar.Arrangement.remove_mapping_dangling_edges`](@ref)
  - [`Lar.Arrangement.planar_arrangement_2`](@ref)
 
 ## Additional arguments:
@@ -1254,7 +1317,7 @@ function planar_arrangement(
     )::Union{Lar.Model, Tuple{Lar.Model, Array{Array{Int, 1}, 1}}}
 
     # Check dimensional condition
-    @assert length(model) == 2;
+    @assert length(model) == 2
 
     # Chek multiprocessing
     if multiproc && Distributed.nprocs() <= 1
@@ -1268,27 +1331,29 @@ function planar_arrangement(
 
     # cleandecomposition
 	if !isempty(sigma)
-		model, edge_map =
-            Lar.Arrangement.cleandecomposition(model, sigma, edge_map)
+		model, edge_map = LarA.cleandecomposition(model, sigma, edge_map)
 	end
 
-    bicon_comps = Lar.Arrangement.biconnected_components(model.T[1])
-    # EV = Lar.cop2lar(copEV)
-    # V,bicon_comps = Lar.biconnectedComponent((V,EV))
+    # generation of biconnected components
+    bicon_comps = LarA.biconnected_components(model.T[1])
 
 	if isempty(bicon_comps)
     	println("No biconnected components found.")
     	if (return_edge_map)
-    	    return (model(), nothing);
+    	    return (model(), nothing)
     	else
-    	    return model();
+    	    return model()
     	end
 	end
 
-    #Planar_arrangement_2
-	model = Lar.Arrangement.planar_arrangement_2(
-        model, bicon_comps, edge_map
-    );
+    # Removing Dangling edges from edge map
+    if return_edge_map
+        @assert size(model.T[1, 1]) == max(edge_map...)                         # CTR
+        edge_map = LarA.remove_mapping_dangling_edges(edge_map, bicon_comps)
+    end
+
+    # Planar_arrangement_2
+	model = LarA.planar_arrangement_2(model, bicon_comps)
 
 	if return_edge_map
 	     return model, edge_map
