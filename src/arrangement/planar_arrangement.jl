@@ -293,6 +293,7 @@ function merge_vertices!(
     # return new vertices and new edges
     model.G = convert(Lar.Points, nV')
     model.T[1] = nEV
+    model.T[2] = SparseArrays.spzeros(Int8, 0, size(model, 1, 1))
     return
 end
 
@@ -363,12 +364,12 @@ function cleandecomposition(
     end
     todel = Array{Int,1}()
     sigma_edges = model.T[1][sigma, :]
-    for e in 1:model.T[1].m
+    for e in 1 : model.T[1].m
         # Since the model is already arranged an edge can only be a sigma-edge,
         #  an intersection-free innner edge w.r.t. sigma face (not to purge),
         #  or an intersection-free outer edge (has to be deleted).
         if !(e in sigma)
-            v1, v2 = Lar.getModelEdgeVertices(model, e)
+            v1, v2 = Lar.getModelCellVertices(model, 1, e)
             centroid = .5*(v1 + v2)
 
             if ! Lar.point_in_face(centroid, V, sigma_edges)
@@ -377,8 +378,8 @@ function cleandecomposition(
         end
     end
 
-    Lar.deleteModelEdges!(model, todel)
-    Lar.modelPurge(model, 0)
+    Lar.deleteModelCells!(model, 1, todel)
+    Lar.modelPurge!(model)
 
     if isempty(edge_map)
         return model
@@ -1120,7 +1121,7 @@ function planar_arrangement_1(
 	# data structures initialization
     # V = convert(Lar.Points, model.G')
     # copEV = model.T[1]
-	edgenum = size(model.T[1], 1)
+	edgenum = size(model, 1, 1)
 	edge_map = Array{Array{Int, 1}, 1}(undef,edgenum)
 	rV = Lar.Points(zeros(0, 2))
 	rEV = SparseArrays.spzeros(Int8, 0, 0)
@@ -1173,7 +1174,7 @@ function planar_arrangement_1(
 
     # merging of close vertices and edges (2D congruence)
     model = Lar.Model(convert(Lar.Points, rV'))
-    model.T[1] = rEV
+    Lar.addModelCells!(model, 1, rEV)
     LarA.merge_vertices!(model, edge_map)
 
     if isempty(sigma)
@@ -1267,8 +1268,8 @@ function planar_arrangement_2(
     )
 
     model = Lar.Model(convert(Lar.Points, V'))
-    model.T[1] = copEV
-    model.T[2] = FE
+    Lar.addModelCells!(model, 1, copEV)
+    Lar.addModelCells!(model, 2, FE)
     Lar.modelPurge!(model)
 	return model
 end
@@ -1348,7 +1349,7 @@ function planar_arrangement(
 
     # Removing Dangling edges from edge map
     if return_edge_map
-        @assert size(model.T[1, 1]) == max(edge_map...)                         # CTR
+        @assert size(model, 1, 1) == max(edge_map...)                           # CTR
         edge_map = LarA.remove_mapping_dangling_edges(edge_map, bicon_comps)
     end
 

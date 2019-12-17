@@ -1,4 +1,6 @@
 using Test
+include("./../src/Lar.jl")
 
-include("./mytest.jl")
+
 include("./arrangement/planar_arrangement.jl")
+include("./model.jl")

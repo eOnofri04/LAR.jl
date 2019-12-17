@@ -13,13 +13,13 @@ LarA = Lar.Arrangement
     model = Lar.Model(hcat([
         [2., 2.], [4., 2.], [3., 3.5], [1., 3.], [5., 3.], [1., 2.], [5., 2.]
     ]...))
-    model.T[1] = SparseArrays.sparse(Array{Int8, 2}([
+    Lar.addModelCells!(model, 1, SparseArrays.sparse(Array{Int8, 2}([
         [1 1 0 0 0 0 0] #1->1,2
         [0 1 1 0 0 0 0] #2->2,3
         [1 0 1 0 0 0 0] #3->1,3
         [0 0 0 1 1 0 0] #4->4,5
         [0 0 0 0 0 1 1] #5->6,7
-    ]))
+    ])))
     bigPI = Lar.spaceindex((model.G, Lar.cop2lar(model.T[1])))
 
     @testset "intersect_edges" begin
@@ -71,7 +71,7 @@ end
         n0 -n0  n0 -n0  n0 -n0  n0 -n0 n1u n1l n1u n1l n1u n1l n1u n1l
         n0  n0 -n0 -n0 n1u n1u n1l n1l n1u n1u n1l n1l  n0  n0 -n0 -n0
     ])
-    model.T[1] = SparseArrays.sparse(Array{Int8, 2}([
+    Lar.addModelCells!(model, 1, SparseArrays.sparse(Array{Int8, 2}([
         [1 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0]
         [0 1 0 0 0 1 0 0 0 0 0 0 0 0 0 0]
         [0 0 1 0 0 0 1 0 0 0 0 0 0 0 0 0]
@@ -88,7 +88,7 @@ end
         [0 1 0 0 0 0 0 0 0 0 0 0 0 1 0 0]
         [0 0 1 0 0 0 0 0 0 0 0 0 0 0 1 0]
         [0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1]
-    ]))
+    ])))
     Lar.Arrangement.merge_vertices!(model)
 
     @test model.G == [n0 n0; n0 n1u; n1u n1u; n1u n0]'
@@ -104,7 +104,7 @@ end
         2.0 2.0 4.0 4.0 1.5 3.0 4.5 3.0
         2.0 4.0 4.0 2.0 3.0 4.5 3.0 1.5
     ])
-    model.T[1] = SparseArrays.sparse(Array{Int8, 2}([
+    Lar.addModelCells!(model, 1, SparseArrays.sparse(Array{Int8, 2}([
         1 1 0 0 0 0 0 0
         0 1 1 0 0 0 0 0
         0 0 1 1 0 0 0 0
@@ -113,7 +113,7 @@ end
         0 0 0 0 0 1 1 0
         0 0 0 0 0 0 1 1
         0 0 0 0 1 0 0 1
-    ]))
+    ])))
     sigma = SparseArrays.sparse(Array{Int8, 1}([
         0; 0; 0; 0; 1; 1; 1; 1
     ]))
@@ -144,12 +144,12 @@ end
         2.0 2.0 2.0 2.0 4.0 2.5 3.5 4.0 4.0 4.0 2.5 3.5 1.5 3.0 4.5 3.0
         2.0 4.0 3.5 2.5 4.0 4.0 4.0 2.0 3.5 2.5 2.0 2.0 3.0 4.5 3.0 1.5
     ])
-    model.T[1] = abs.(Lar.coboundary_0([
+    Lar.addModelCells!(model, 1, abs.(Lar.coboundary_0([
         [ 1,  4], [ 4,  3], [ 3,  2], [ 2,  6], [ 6,  7], [ 7,  5],
         [ 5,  9], [ 9, 10], [10,  8], [ 1, 11], [11, 12], [12,  8],
         [13,  3], [ 3,  6], [ 6, 14], [14,  7], [ 7,  9], [ 9, 15],
         [15, 10], [10, 12], [12, 16], [13,  4], [ 4, 11], [11, 16]
-    ]))
+    ])))
     sigma = collect(13:24)
     edges = [
         [ 1,  2,  3], [ 4,  5,  6], [ 7,  8,  9], [10, 11, 12],
@@ -235,23 +235,23 @@ end
         @test Lar.Arrangement.get_external_cycle(V, EV, FE) == 3
 
         model = Lar.Model(hcat([[0.0,0.0], [4.0,0.0], [2.0,3.0], [2.0,1.5]]...))
-        model.T[1] = SparseArrays.sparse(Array{Int8, 2}([
+        Lar.addModelCells!(model, 1, SparseArrays.sparse(Array{Int8, 2}([
     		[1 1 0 0] #1 -> 1,2
     		[0 1 1 0] #2 -> 2,3
     		[1 0 1 0] #3 -> 3,1
     		[1 0 0 1] #4 -> 1,2
     		[0 1 0 1] #5 -> 2,3
     		[0 0 1 1] #6 -> 3,1
-    	]))
-        model.T[2] = SparseArrays.sparse(Array{Int8, 2}([
+    	])))
+        Lar.addModelCells!(model, 2, SparseArrays.sparse(Array{Int8, 2}([
     		[1 0 0 1 1 0] #1 -> 1,4,5
     		[0 1 0 0 1 1] #2 -> 2,5,6
     		[0 0 1 1 0 1] #3 -> 3,4,6
     		[1 1 1 0 0 0] #4 -> 1,2,3 External
-    	]))
+    	])))
 
         @test LarA.get_external_cycle(model) == 4
-        model.T[2] = model.T[2][1:3,:]
+        Lar.deleteModelCell!(model, 2, 4)
         @test isnothing(LarA.get_external_cycle(model))
     end
 
@@ -367,11 +367,11 @@ end
         0.0 0 2 0 0 1 4 4 3 2 4 4
         0.0 2 0 3 4 4 2 0 0 4 4 2
     ]);
-    model.T[1] = abs.(Lar.coboundary_0([
+    Lar.addModelCells!(model, 1, abs.(Lar.coboundary_0([
         [ 1,  2], [ 2,  3], [ 3,  1],
         [ 4,  5], [ 5,  6], [ 6,  7], [ 7,  8], [ 8,  9], [ 9, 4],
         [10, 11], [11, 12], [12, 10]
-    ]))
+    ])))
 
     bicon_comps = [
         [ 1,  2,  3],
@@ -392,7 +392,7 @@ end
         0.0  4.0  8.0  4.0  2.0  6.0  4.0 -4.0 12.0  4.0  3.0  5.0  4.0  4.0
         0.0  6.0  0.0  0.0  3.0  3.0 -6.0  6.0  6.0  1.0  2.5  2.5  1.0  2.0
     ])
-    triforce.T[1] = SparseArrays.sparse(Array{Int8, 2}([
+    Lar.addModelCells!(triforce, 1, SparseArrays.sparse(Array{Int8, 2}([
         [1 1 0 0 0 0 0 0 0 0 0 0 0 0]
         [0 1 1 0 0 0 0 0 0 0 0 0 0 0]
         [1 0 1 0 0 0 0 0 0 0 0 0 0 0]
@@ -406,7 +406,7 @@ end
         [0 0 0 0 0 0 0 0 0 0 1 1 0 0]
         [0 0 0 0 0 0 0 0 0 1 0 1 0 0]
         [0 0 0 0 0 0 0 0 0 0 0 0 1 1]
-    ]))
+    ])))
     sigma = convert(Lar.Chain, SparseArrays.sparse([
         1; 1; 1; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0
     ]))
@@ -416,7 +416,7 @@ end
         0.0  4.0  2.0  8.0  6.0  4.0  4.0 -4.0 12.0  4.0  3.0  5.0  4.0
         0.0  6.0  3.0  0.0  3.0  0.0 -6.0  6.0  6.0  1.0  2.5  2.5  2.0
     ])
-    arranged_triforce.T[1] = SparseArrays.sparse(Int8[
+    Lar.addModelCells!(arranged_triforce, 1, SparseArrays.sparse(Int8[
         1 0 1 0 0 0 0 0 0 0 0 0 0
         0 1 1 0 0 0 0 0 0 0 0 0 0
         0 1 0 0 1 0 0 0 0 0 0 0 0
@@ -436,7 +436,7 @@ end
         0 0 0 0 0 0 0 0 0 0 1 1 0
         0 0 0 0 0 0 0 0 0 1 0 1 0
         0 0 0 0 0 0 0 0 0 1 0 0 1
-    ])
+    ]))
     arranged_sigma = collect(1:6)
     arranged_edge_map = Array{Int64,1}[
         [ 1,  2], [ 3,  4], [ 5,  6],
@@ -455,7 +455,7 @@ end
         0.0 4.0 2.0 8.0 6.0 4.0 4.0 3.0 5.0 4.0
         0.0 6.0 3.0 0.0 3.0 0.0 1.0 2.5 2.5 2.0
     ])
-    cleaned_triforce.T[1] = SparseArrays.sparse(Int8[
+    Lar.addModelCells!(cleaned_triforce, 1, SparseArrays.sparse(Int8[
         1 0 1 0 0 0 0 0 0 0
         0 1 1 0 0 0 0 0 0 0
         0 1 0 0 1 0 0 0 0 0
@@ -469,7 +469,7 @@ end
         0 0 0 0 0 0 0 1 1 0
         0 0 0 0 0 0 1 0 1 0
         0 0 0 0 0 0 1 0 0 1
-    ])
+    ]))
     cleaned_edge_map = Array{Int64,1}[
         [1, 2], [3, 4], [5, 6],
         [   7], [   8], [   9],
@@ -502,7 +502,7 @@ end
         0.0 4.0 2.0 8.0 6.0 4.0 4.0 3.0 5.0
         0.0 6.0 3.0 0.0 3.0 0.0 1.0 2.5 2.5
     ])
-    rearranged_triforce.T[1] = SparseArrays.sparse(Int8[
+    Lar.addModelCells!(rearranged_triforce, 1, SparseArrays.sparse(Int8[
         -1  0  1  0  0  0  0  0  0
          0 -1  1  0  0  0  0  0  0
          0 -1  0  0  1  0  0  0  0
@@ -515,14 +515,14 @@ end
          0  0  0  0  0  0 -1  1  0
          0  0  0  0  0  0  0 -1  1
          0  0  0  0  0  0 -1  0  1
-    ])
-    rearranged_triforce.T[2] = SparseArrays.sparse([
+    ]))
+    Lar.addModelCells!(rearranged_triforce, 2, SparseArrays.sparse(Int8[
         0  0  0  0  0  0  1 -1 -1  1  1 -1
         -1 0  0  0  1  0 -1  0  0  0  0  0
         0  1 -1  0  0  0  0  1  0  0  0  0
         0  0  0  1  0 -1  0  0  1  0  0  0
         0  0  0  0  0  0  0  0  0 -1 -1  1
-    ])
+    ]))
     a = Lar.Arrangement.planar_arrangement_2(a, c)
     @test rearranged_triforce == a
 
