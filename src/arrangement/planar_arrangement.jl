@@ -1323,23 +1323,33 @@ function planar_arrangement(
     # Chek multiprocessing
     if multiproc && Distributed.nprocs() <= 1
         multiproc = false
-        println("Setting Multiproc to False due to insufficient processors.")
+        println("Setting Multiproc to False due to insufficient processors.\n")
     end
 
     #planar_arrangement_1
-	model, sigma, edge_map =
-        LarA.planar_arrangement_1(model, sigma, true, multiproc)
+    if isempty(sigma)
+        model, edge_map =
+            LarA.planar_arrangement_1(model, sigma, true, multiproc)
+    else
+	    model, sigma, edge_map =
+            LarA.planar_arrangement_1(model, sigma, true, multiproc)
+    end
+
+    print("PLANAR_ARRANGEMENT_1 COMPLETE\n")
 
     # cleandecomposition
 	if !isempty(sigma)
 		model, edge_map = LarA.cleandecomposition(model, sigma, edge_map)
+        print("DECOMPOSITION CLEANED\n")
 	end
 
     # generation of biconnected components
     bicon_comps = LarA.biconnected_components(model.T[1])
 
+    print("BICONNECTED COMPONENTS FOUND\n")
+
 	if isempty(bicon_comps)
-    	println("No biconnected components found.")
+    	println("No biconnected components found.\n")
     	if (return_edge_map)
     	    return (model(), nothing)
     	else
@@ -1349,12 +1359,16 @@ function planar_arrangement(
 
     # Removing Dangling edges from edge map
     if return_edge_map
-        @assert size(model, 1, 1) == max(edge_map...)                           # CTR
+        @assert size(model, 1, 1) == max((edge_map...)...)                           # CTR
         edge_map = LarA.remove_mapping_dangling_edges(edge_map, bicon_comps)
     end
 
+    print("DANGLING EDGES REMOVED\n")
+
     # Planar_arrangement_2
 	model = LarA.planar_arrangement_2(model, bicon_comps)
+
+    print("PLANAR ARRANGEMENT 2 COMPLETE\n")
 
 	if return_edge_map
 	     return model, edge_map
