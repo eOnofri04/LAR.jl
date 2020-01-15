@@ -1,4 +1,5 @@
-using SparseArrays, LightXML
+using SparseArrays, LightXML, ViewerGL
+GL = ViewerGL
 include("./../src/Lar.jl")
 
 
@@ -44,3 +45,67 @@ for street in way_list
         Lar.addModelCells!(model, 1, convert(Lar.ChainOp, newcell'))
     end
 end
+
+
+#===
+    extraction of a box of
+     0.31<lats<0.55
+     0.65<lons<0.75
+===#
+
+toDelV = convert(Array{Int64,1},
+    [i  for i = 1 : size(model, 0, 2)
+        if model.G[1, i] < 0.31
+        || model.G[1, i] > 0.35
+        || model.G[2, i] < 0.65
+        || model.G[2,i] > 0.75
+    ]
+)
+Lar.deleteModelVertices!(model, toDelV)
+
+GL.VIEW([GL.GLGrid(model.G, Lar.cop2lar(model.T[1]))])
+
+
+#=== NOW IT LOOPS ===#
+LarA = Lar.Arrangement
+
+sigma           = spzeros(Int8, 0)
+return_edge_map = false
+multiproc       = false
+
+model, edge_map = LarA.planar_arrangement_1(model, sigma, true, multiproc)
+
+bicon_comps = LarA.biconnected_components(model.T[1])
+V           = convert(Lar.Points, model.G')
+copEV       = model.T[1]
+
+# arrangement of isolated components
+n = size(bicon_comps, 1)
+shells = Array{Lar.Chain, 1}(undef, n)
+boundaries = Array{Lar.ChainOp, 1}(undef, n)
+EVs = Array{Lar.ChainOp, 1}(undef, n)
+# for each component
+for p in 2 : n
+    ev = copEV[sort(bicon_comps[p]), :]
+    # computation of 2-cells
+    fe = LarA.minimal_2cycles(V, ev)
+    # exterior cycle
+    shell_num = LarA.get_external_cycle(V, ev, fe)
+    # decompose each fe (co-boundary local to component)
+    EVs[p] = ev
+    tokeep = setdiff(1:fe.m, shell_num)
+    boundaries[p] = fe[tokeep, :]
+    shells[p] = fe[shell_num, :]
+end
+
+p = 1
+ev = copEV[sort(bicon_comps[p]), :]
+# computation of 2-cells
+fe = LarA.minimal_2cycles(V, ev)                         # <---| Here it loops
+# exterior cycle
+shell_num = LarA.get_external_cycle(V, ev, fe)
+# decompose each fe (co-boundary local to component)
+EVs[p] = ev
+tokeep = setdiff(1:fe.m, shell_num)
+boundaries[p] = fe[tokeep, :]
+shells[p] = fe[shell_num, :]

@@ -970,9 +970,9 @@ function componentgraph(V, copEV, bicon_comps)
    		push!(shell_bboxes, Lar.bbox(V[vs_indexes, :]))
 	end
     # computation and reduction of containment graph
-	containment_graph = pre_containment_test(shell_bboxes)
-	containment_graph = prune_containment_graph(V,EVs,shells,containment_graph)
-	transitive_reduction!(containment_graph)
+	containment_graph = LarA.pre_containment_test(shell_bboxes)
+	containment_graph = LarA.prune_containment_graph(V,EVs,shells,containment_graph)
+	LarA.transitive_reduction!(containment_graph)
 	return n, containment_graph, V, EVs, boundaries, shells, shell_bboxes
 end
 
