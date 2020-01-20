@@ -7,6 +7,9 @@ module Lar
 	using SparseArrays
 	using LinearAlgebra
 	#using Distributed
+	using LinearAlgebraicRepresentation
+
+	LAR = LinearAlgebraicRepresentation
 
 	"""
 		Points = Array{Number,2}
@@ -73,39 +76,19 @@ module Lar
 	"""
 	const ChainComplex = Array{ChainOp,1}
 
-
-	"""
-		LARmodel = Tuple{Points,Array{Cells,1}}
-
-	Alias declation of LAR-specific data structure.
-	`LARmodel` is a pair (*Geometry*, *Topology*), where *Geometry* is stored as
-	`Points`, and *Topology* is stored as `Array` of `Cells`. The number of `Cells`
-	values may vary from `1` to `N+1`.
-	"""
-	const LARmodel = Tuple{Points,Array{Cells,1}}
-
-	"""
-		LAR = Union{ Tuple{Points, Cells},Tuple{Points, Cells, Cells} }
-
-	Alias declation of LAR-specific data structure.
-	`LAR` is a pair (*Geometry*, *Topology*), where *Geometry* is stored as
-	`Points`, and *Topology* is stored as `Cells`.
-	"""
-	const LAR = Union{ Tuple{Points, Cells},Tuple{Points, Cells, Cells} }
-
 	include("./model.jl")
 	include("./arrangement/arrangement.jl");
-	include("./interface.jl")
-    include("./utilities.jl")
-    include("./simplexn.jl")
-    include("./largrid.jl")
-    include("./mapper.jl")
-    include("./struct.jl")
-    include("./integr.jl")
-    include("./refactoring.jl")
-    include("./graphalgorithms.jl")
-    include("./fragface.jl")
-    include("./svg2lar.jl")
-    include("./bool3d.jl")
-    include("./bool2d.jl")
+	#include("./interface.jl")
+    #include("./utilities.jl")
+    #include("./simplexn.jl")
+    #include("./largrid.jl")
+    #include("./mapper.jl")
+    #include("./struct.jl")
+    #include("./integr.jl")
+    #include("./refactoring.jl")
+    #include("./graphalgorithms.jl")
+    #include("./fragface.jl")
+    #include("./svg2lar.jl")
+    #include("./bool3d.jl")
+    #include("./bool2d.jl")
 end

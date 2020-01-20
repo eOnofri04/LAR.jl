@@ -1,5 +1,7 @@
 using SparseArrays, Test
 LarA = Lar.Arrangement
+using LinearAlgebraicRepresentation
+LAR = LinearAlgebraicRepresentation
 
 #-------------------------------------------------------------------------------
 #   PLANAR ARRANGEMENT PIPELINE - PART 1 METHODS
@@ -20,7 +22,7 @@ LarA = Lar.Arrangement
         [0 0 0 1 1 0 0] #4->4,5
         [0 0 0 0 0 1 1] #5->6,7
     ])))
-    bigPI = Lar.spaceindex((model.G, Lar.cop2lar(model.T[1])))
+    bigPI = LarA.spaceIndex(model)
 
     @testset "intersect_edges" begin
         V = convert(Lar.Points, model.G')
@@ -122,7 +124,7 @@ end
         2.0 2.0 2.0 2.0 4.0 2.5 3.5 4.0 4.0 4.0 2.5 3.5 1.5 3.0 4.5 3.0
         2.0 4.0 3.5 2.5 4.0 4.0 4.0 2.0 3.5 2.5 2.0 2.0 3.0 4.5 3.0 1.5
     ]
-    @test model.T[1] == abs.(Lar.coboundary_0([
+    @test model.T[1] == abs.(LAR.coboundary_0([
         [1,4],[4,3],[3,2],[2,6],[6,7],[7,5],
         [5,9],[9,10],[10,8],[1,11],[11,12],[12,8],
         [13,3],[3,6],[6,14],[14,7],[7,9],[9,15],
@@ -144,7 +146,7 @@ end
         2.0 2.0 2.0 2.0 4.0 2.5 3.5 4.0 4.0 4.0 2.5 3.5 1.5 3.0 4.5 3.0
         2.0 4.0 3.5 2.5 4.0 4.0 4.0 2.0 3.5 2.5 2.0 2.0 3.0 4.5 3.0 1.5
     ])
-    Lar.addModelCells!(model, 1, abs.(Lar.coboundary_0([
+    Lar.addModelCells!(model, 1, abs.(LAR.coboundary_0([
         [ 1,  4], [ 4,  3], [ 3,  2], [ 2,  6], [ 6,  7], [ 7,  5],
         [ 5,  9], [ 9, 10], [10,  8], [ 1, 11], [11, 12], [12,  8],
         [13,  3], [ 3,  6], [ 6, 14], [14,  7], [ 7,  9], [ 9, 15],
@@ -160,7 +162,7 @@ end
         2.0 2.0 2.5 3.5 4.0 4.0 2.5 3.5 1.5 3.0 4.5 3.0
         3.5 2.5 4.0 4.0 3.5 2.5 2.0 2.0 3.0 4.5 3.0 1.5
     ]
-    @test model.T[1] == abs.(Lar.coboundary_0([
+    @test model.T[1] == abs.(LAR.coboundary_0([
         [ 2,  1], [ 3,  4],
         [ 5,  6], [ 8,  7],
         [ 9,  1], [ 1,  3], [3, 10], [10,  4], [ 4,  5], [ 5, 11],
@@ -292,7 +294,7 @@ end
         n = 5
         for i in 1:n
             vs_indexes = (abs.(EVs[i]')*abs.(shells[i])).nzind
-            push!(shell_bboxes, Lar.bbox(V[vs_indexes, :]))
+            push!(shell_bboxes, LAR.bbox(V[vs_indexes, :]))
         end
 
         graph = Lar.Arrangement.pre_containment_test(shell_bboxes)
@@ -344,7 +346,7 @@ end
         n = 2
         for i in 1:n
             vs_indexes = (abs.(EVs[i]')*abs.(shells[i])).nzind
-            push!(shell_bboxes, Lar.bbox(V[vs_indexes, :]))
+            push!(shell_bboxes, LAR.bbox(V[vs_indexes, :]))
         end
 
         EV, FE = Lar.Arrangement.cell_merging(2, graph, V, EVs, boundaries, shells, shell_bboxes)
@@ -367,7 +369,7 @@ end
         0.0 0 2 0 0 1 4 4 3 2 4 4
         0.0 2 0 3 4 4 2 0 0 4 4 2
     ]);
-    Lar.addModelCells!(model, 1, abs.(Lar.coboundary_0([
+    Lar.addModelCells!(model, 1, abs.(LAR.coboundary_0([
         [ 1,  2], [ 2,  3], [ 3,  1],
         [ 4,  5], [ 5,  6], [ 6,  7], [ 7,  8], [ 8,  9], [ 9, 4],
         [10, 11], [11, 12], [12, 10]

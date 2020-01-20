@@ -118,6 +118,23 @@ end
 function addModelCell!(m::Lar.Model, deg::Int, c::Lar.Cell)::Nothing
     Lar.addModelCells!(m, deg, convert(Lar.ChainOp, c))
 end
+function addModelCells!(m::Lar.Model, deg::Int, cs::Lar.Cells)::Nothing
+    I = Array{Int,1}()
+    J = Array{Int,1}()
+    K = Array{Int8,1}()
+    for i = 1 : length(cs)
+        for j = 1 : length(cs[i])
+            push!(I, i)
+            push!(J, cs[i][j])
+            push!(K, 1)
+        end
+    end
+
+    scs = SparseArrays.sparse(I, J, K, length(cs), size(m, deg, 2));
+
+    return addModelCells!(m, deg, scs);
+end
+
 
 function deleteModelCells!(m::Lar.Model, deg::Int, cs::Array{Int, 1})::Nothing
     deg > 0 || throw(ArgumentError("Degree must be a non negative value"))
@@ -225,25 +242,3 @@ end
 
 
 #TODO check if removing sparse zeros is necessary
-
-
-#-------------------------------------------------------------------------------
-#   MODEL BOUNDING BOXES
-#-------------------------------------------------------------------------------
-
-function getModelBoundingBox(
-		model::Lar.Model,
-		deg::Int
-	)::Array{Array{Float64,2},1}
-
-	function findBBox(pts::Lar.Points)::Tuple{Array{Float64,2},Array{Float64,2}}
-		minimum = mapslices(x->min(x...), pts, dims=2)
-		maximum = mapslices(x->max(x...), pts, dims=2)
-		return minimum, maximum
-	end
-
-	cellpts = [ hcat(Lar.getModelCellVertices(model, deg, c)...)
-				for c = 1 : size(model, deg, 1)
-			  ]
-	return [hcat(findBBox(c)...) for c in cellpts]
-end

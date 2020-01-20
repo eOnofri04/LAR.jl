@@ -1,3 +1,6 @@
+LAR = LinearAlgebraicRepresentation
+LarA = Lar.Arrangement
+
 function minimal_2cycles(V::Lar.Points, EV::Lar.ChainOp)
 
     function edge_angle(v::Int, e::Int)
@@ -7,12 +10,12 @@ function minimal_2cycles(V::Lar.Points, EV::Lar.ChainOp)
         return atan(y, x)
     end
 
-    for i in 1:EV.m
-        j = min(EV[i,:].nzind...)
+    for i in 1 : EV.m
+        j = min(EV[i, :].nzind...)
         EV[i, j] = -1
     end
     VE = convert(Lar.ChainOp, SparseArrays.transpose(EV))
-    EF = Lar.Arrangement.minimal_cycles(edge_angle)(V, VE)
+    EF = LarA.minimal_cycles(edge_angle)(V, VE)
 
     return convert(Lar.ChainOp, SparseArrays.transpose(EF))
 end
@@ -37,7 +40,7 @@ function minimal_3cycles(V::Lar.Points, EV::Lar.ChainOp, FE::Lar.ChainOp)
             end
 
             #vs = V[vs_idxs, :]
-			fv,edges = Lar.vcycle(EV, FE, f)
+			fv,edges = LAR.vcycle(EV, FE, f)
 
 			vs = V[fv, :]
 
@@ -62,7 +65,7 @@ function minimal_3cycles(V::Lar.Points, EV::Lar.ChainOp, FE::Lar.ChainOp)
 			v = convert(Lar.Points, vs'[1:2,:])
 			vmap = Dict(zip(fv,1:length(fv))) # vertex map
 			mapv = Dict(zip(1:length(fv),fv)) # inverse vertex map
-			trias = Lar.triangulate2d(v,edges)
+			trias = LAR.triangulate2d(v,edges)
 			triangulated_faces[f] = [[mapv[v] for v in tria] for tria in trias]
         end
         edge_vs = EV[e, :].nzind
@@ -94,7 +97,7 @@ function minimal_3cycles(V::Lar.Points, EV::Lar.ChainOp, FE::Lar.ChainOp)
 
     #EF = FE'
     EF = convert(Lar.ChainOp, LinearAlgebra.transpose(FE))
-	FC = Lar.Arrangement.minimal_cycles(face_angle, true)(V, EF)
+	FC = LarA.minimal_cycles(face_angle, true)(V, EF)
 
 	#FC'
     return -convert(Lar.ChainOp, LinearAlgebra.transpose(FC))

@@ -1,5 +1,5 @@
 LarA = Lar.Arrangement
-
+LAR = LinearAlgebraicRepresentation
 #-------------------------------------------------------------------------------
 #   PLANAR ARRANGEMENT PIPELINE - PART 1 METHODS
 #    frag_edge_channel
@@ -64,20 +64,18 @@ It uses: [`Lar.Arrangement.intersect_edges`](@ref)
 julia> model = Lar.Model(hcat([
     [1.0, 0.0], [0.0, 1.0], [0.0, 0.5], [0.5, 1.0], [1.0, 1.0]
 ]...));
-julia> model.T[1] = Lar.coboundary_0([[1, 2], [2, 5], [3, 4], [4, 5]]);
-julia> bigPI = Lar.spaceindex((model.G, Lar.cop2lar(model.T[1])));
+julia> Lar.addModelCells!(model, 1, [[1, 2], [2, 5], [3, 4], [4, 5]])
+julia> bigPI = LarA.spaceIndex(model);
 julia> LarA.frag_edge(model, 1, bigPI)[1]
 4×2 Array{Float64,2}:
  1.0   0.0
  0.0   1.0
  0.25  0.75
  0.0   1.0
-julia> LarA.frag_edge(model, 1, bigPI)[2]
-2×4 SparseMatrixCSC{Int8,Int64} with 4 stored entries:
-  [1, 1]  =  1
-  [2, 2]  =  1
-  [1, 3]  =  1
-  [2, 3]  =  1
+julia> Matrix(LarA.frag_edge(model, 1, bigPI)[2])
+2×4 Array{Int8,2}:
+ 1  0  1  0
+ 0  1  1  0
 ```
 """
 function frag_edge(
@@ -132,7 +130,7 @@ See also: [`Lar.Arrangement.frag_edge`](@ref)
 ```jldoctest
 # Cross
 julia> V = [1.0 0.0; 0.0 1.0; 0.0 0.5; 0.5 1.0];
-julia> copEV = Lar.coboundary_0([[1, 2], [3, 4]]);
+julia> copEV = LAR.coboundary_0([[1, 2], [3, 4]]);
 julia> LarA.intersect_edges(V, copEV[1, :], copEV[2, :])
 1-element Array{Tuple{Array{T,2} where T,Float64},1}:
  ([0.25 0.75], 0.75)
@@ -141,12 +139,12 @@ julia> LarA.intersect_edges(V, copEV[1, :], copEV[2, :])
 ```jldoctest
 # Collinear
 julia> V = [1.0 0.0; 0.0 1.0; 0.75 0.25; 0.5 0.5];
-julia> copEV = Lar.coboundary_0([[1, 2], [3, 4]]);
-julia> Lar.Arrangement.intersect_edges(V, copEV[1, :], copEV[2, :])
+julia> copEV = LAR.coboundary_0([[1, 2], [3, 4]]);
+julia> LarA.intersect_edges(V, copEV[1, :], copEV[2, :])
 2-element Array{Tuple{Array{T,2} where T,Float64},1}:
  ([0.75 0.25], 0.25)
  ([0.5 0.5], 0.5)
-julia> Lar.Arrangement.intersect_edges(V, copEV[2, :], copEV[1, :])
+julia> LarA.intersect_edges(V, copEV[2, :], copEV[1, :])
 0-element Array{Tuple{Array{T,2} where T,Float64},1}
 ```
 """
@@ -218,20 +216,18 @@ julia> model = Lar.Model([
     0.5 0.0 0.5 1.0 0.5 1.0
     0.5 0.0 0.5 1.0 0.5 1.0
 ]);
-julia> model.T[1] = Lar.coboundary_0([[1, 4], [3, 2], [5, 6], [1, 6], [5, 3]]);
-julia> LarA.merge_vertices!(model, [[-1]])
+julia> Lar.addModelCells!(model, 1, [[1, 4], [3, 2], [5, 6], [1, 6], [5, 3]]);
+julia> LarA.merge_vertices!(model)
 
 julia> model.G
 2×3 Array{Float64,2}:
  0.5  0.0  1.0
  0.5  0.0  1.0
 
-julia> model.T[1]
-2×3 SparseMatrixCSC{Int8,Int64} with 4 stored entries:
-  [1, 1]  =  1
-  [2, 1]  =  1
-  [2, 2]  =  1
-  [1, 3]  =  1
+julia> Matrix(model.T[1])
+2×3 Array{Int8,2}:
+ 1  0  1
+ 1  1  0
 ```
 """
 function merge_vertices!(
@@ -253,7 +249,7 @@ function merge_vertices!(
     i = 1
     for vi in 1:vertsnum
         if !(vi in todelete)
-            nearvs = Lar.inrange(kdtree, V[vi, :], err)
+            nearvs = LAR.inrange(kdtree, V[vi, :], err)
             newverts[nearvs] .= i
             nearvs = setdiff(nearvs, vi)
             todelete = union(todelete, nearvs)
@@ -323,29 +319,31 @@ See also: [`Lar.planar_arrangement`](@ref)
 # Examples
 ```jldoctest
 # Nested Triangles
-julia> V = [
-		0.0 0.0; 2.0 0.0; 4.0 0.0;
-		1.0 1.5; 3.0 1.5; 2.0 3.0;
-		2.0 -3.; -2. 3.0; 6.0 3.0
-	];
-
-julia> copEV = SparseArrays.sparse(Array{Int8, 2}([
-    [1 0 1 0 0 0 0 0 0] #1 -> 1,3
-    [1 0 0 0 0 1 0 0 0] #2 -> 1,6
-    [0 0 1 0 0 1 0 0 0] #3 -> 3,6
-    [0 1 0 1 0 0 0 0 0] #4 -> 2,4
-    [0 1 0 0 1 0 0 0 0] #5 -> 2,5
-    [0 0 0 1 1 0 0 0 0] #6 -> 4,5
-    [0 0 0 0 0 0 1 1 0] #7 -> 7,8
-    [0 0 0 0 0 0 1 0 1] #8 -> 7,9
-    [0 0 0 0 0 0 0 1 1] #9 -> 8,9
-    ]));
+julia> model = Lar.Model([
+    0.0  2.0  4.0  1.0  3.0  2.0  2.0 -2.0  6.0
+    0.0  0.0  0.0  1.5  1.5  3.0 -3.0  3.0  3.0
+]);
+julia> Lar.addModelCells!(model, 1, [
+    [1, 3], [1, 6], [3, 6], [2, 4], [2, 5], [4, 5], [7, 8], [7, 9], [8, 9]
+]);
 
 julia> σ = SparseArrays.sparse([1; 1; 1; 0; 0; 0; 0; 0; 0]);
 
-todel, V, copEV = LarA.cleandecomposition(V, copEV, convert(Lar.Chain, σ))
+julia> model = LarA.cleandecomposition(model, convert(Lar.Chain, σ))
 
-Plasm.view(convert(Lar.Points, V'), Lar.cop2lar(copEV));
+julia> model.G
+2×6 Array{Float64,2}:
+ 0.0  2.0  4.0  1.0  3.0  2.0
+ 0.0  0.0  0.0  1.5  1.5  3.0
+
+julia> Matrix(model.T[1])
+6×6 Array{Int8,2}:
+ 1  0  1  0  0  0
+ 1  0  0  0  0  1
+ 0  0  1  0  0  1
+ 0  1  0  1  0  0
+ 0  1  0  0  1  0
+ 0  0  0  1  1  0
 ```
 """
 function cleandecomposition(
@@ -356,7 +354,7 @@ function cleandecomposition(
 
     model = deepcopy(model)
     edge_map = deepcopy(edge_map)
-    # Model point extraction to use Lar.point_in_face                           ##
+    # Model point extraction to use LAR.point_in_face                           ##
     V = convert(Lar.Points, model.G')
 
     if issparse(sigma)
@@ -372,7 +370,7 @@ function cleandecomposition(
             v1, v2 = Lar.getModelCellVertices(model, 1, e)
             centroid = .5*(v1 + v2)
 
-            if ! Lar.point_in_face(centroid, V, sigma_edges)
+            if ! LAR.point_in_face(centroid, V, sigma_edges)
                 push!(todel, e)
             end
         end
@@ -620,25 +618,13 @@ See also: [`Lar.Arrangement.componentgraph`](@ref).
 ```jldoctest
 # ``K^4`` graph
 julia> model = Lar.Model(hcat([[0.0,0.0], [4.0,0.0], [2.0,3.0], [2.0,1.5]]...));
-julia> model.T[1] = SparseArrays.sparse(Array{Int8, 2}([
-		[1 1 0 0] #1 -> 1,2
-		[0 1 1 0] #2 -> 2,3
-		[1 0 1 0] #3 -> 3,1
-		[1 0 0 1] #4 -> 1,2
-		[0 1 0 1] #5 -> 2,3
-		[0 0 1 1] #6 -> 3,1
-	]));
-julia> model.T[2] = SparseArrays.sparse(Array{Int8, 2}([
-		[1 0 0 1 1 0] #1 -> 1,4,5
-		[0 1 0 0 1 1] #2 -> 2,5,6
-		[0 0 1 1 0 1] #3 -> 3,4,6
-		[1 1 1 0 0 0] #4 -> 1,2,3 External
-	]));
+julia> Lar.addModelCells!(model, 1, [[1,2],[2,3],[3,1],[1,4],[2,4],[3,4]]);
+julia> Lar.addModelCells!(model, 2, [[1,4,5],[2,5,6],[3,4,6],[1,2,3]]);
 
 julia> LarA.get_external_cycle(model)
 4
 
-julia> model.T[2] = model.T[2][1:3,:];
+julia> Lar.deleteModelCell!(model, 2, 4);
 julia> typeof(LarA.get_external_cycle(model))
 Nothing
 ```
@@ -683,7 +669,7 @@ function get_external_cycle(
         return cells[1]
     else
         for c in cells
-            if Lar.face_area(V, EV, FE[c, :]) < 0
+            if LAR.face_area(V, EV, FE[c, :]) < 0
                 return c
             end
         end
@@ -733,7 +719,7 @@ function pre_containment_test(
 
     for i in 1:n
         for j in 1:n
-            if i != j && Lar.bbox_contains(bboxes[j], bboxes[i])
+            if i != j && LAR.bbox_contains(bboxes[j], bboxes[i])
                 containment_graph[i, j] = 1
             end
         end
@@ -785,7 +771,7 @@ function prune_containment_graph(
                 shell_edge_indexes = shells[j].nzind
                 ev = EVs[j][shell_edge_indexes, :]
 
-                if !Lar.point_in_face(origin, V, ev)
+                if !LAR.point_in_face(origin, V, ev)
                     graph[i, j] = 0
                 end
             end
@@ -967,7 +953,7 @@ function componentgraph(V, copEV, bicon_comps)
 	shell_bboxes = []
 	for i in 1:n
     	vs_indexes = (abs.(EVs[i]')*abs.(shells[i])).nzind
-   		push!(shell_bboxes, Lar.bbox(V[vs_indexes, :]))
+   		push!(shell_bboxes, LAR.bbox(V[vs_indexes, :]))
 	end
     # computation and reduction of containment graph
 	containment_graph = LarA.pre_containment_test(shell_bboxes)
@@ -992,7 +978,7 @@ function cell_merging(
         boxes = Array{Tuple{Any, Any}}(undef, indexes.n)
         for i in 1:indexes.n
             v_inds = indexes[:, i].nzind
-            boxes[i] = Lar.bbox(V[v_inds, :])
+            boxes[i] = LAR.bbox(V[v_inds, :])
         end
         boxes
     end
@@ -1008,7 +994,7 @@ function cell_merging(
                 if containment_graph[child, father] > 0
                     child_bbox = shell_bboxes[child]
                     for b in 1:length(father_bboxes)
-                        if Lar.bbox_contains(father_bboxes[b], child_bbox)
+                        if LAR.bbox_contains(father_bboxes[b], child_bbox)
                             push!(sums, (father, b, child))
                             break
                         end
@@ -1075,33 +1061,38 @@ julia> model = Lar.Model([
     0.0 0.5 0.0 0.5 0.3 1.0 0.3 1.0;
     0.0 0.0 1.0 1.0 0.5 0.5 1.0 1.0
 ]);
-julia> model.T[1] = Lar.coboundary_0(
-    [[1, 2], [3, 4], [1, 3], [2, 4], [5, 6], [7, 8], [5, 7], [6, 8]]
-);
-julia> (model, sigma, edge_map) =
+julia> Lar.addModelCells!(model, 1, [
+    [1, 2], [3, 4], [1, 3], [2, 4], [5, 6], [7, 8], [5, 7], [6, 8]
+]);
+julia> (model, edge_map) =
     LarA.planar_arrangement_1(model, spzeros(Int8, 0), true);
-
 julia> model.G
 2×9 Array{Float64,2}:
  0.0  0.5  0.0  0.5  0.3  0.5  0.3  1.0  1.0
  0.0  0.0  1.0  1.0  1.0  0.5  0.5  0.5  1.0
 
-julia> model.T[1]
-11×9 SparseMatrixCSC{Int8,Int64} with 22 stored entries:
- [1 , 1]  =  1
- [4 , 1]  =  1
- ⋮
- [9 , 9]  =  1
- [11, 9]  =  1
-
-julia> sigma
-0-element SparseVector{Int8,Int64} with 0 stored entries
+julia> Matrix(model.T[1])
+11×9 Array{Int8,2}:
+ 1  1  0  0  0  0  0  0  0
+ 0  0  1  1  0  0  0  0  0
+ 0  0  0  1  1  0  0  0  0
+ 1  0  1  0  0  0  0  0  0
+ 0  1  0  0  0  1  0  0  0
+ 0  0  0  0  1  1  0  0  0
+ 0  0  0  0  0  1  1  0  0
+ 0  0  0  0  0  1  0  1  0
+ 0  0  0  0  1  0  0  0  1
+ 0  0  0  1  0  0  1  0  0
+ 0  0  0  0  0  0  0  1  1
 
 julia> edge_map
 8-element Array{Array{Int64,1},1}:
  [1]
  [2, 3]
- ⋮
+ [4]
+ [5, 6]
+ [7, 8]
+ [3, 9]
  [10]
  [11]
 
@@ -1128,7 +1119,7 @@ function planar_arrangement_1(
 	finalcells_num = 0
 
 	# spaceindex computation
-	bigPI = Lar.spaceindex((model.G, Lar.cop2lar(model.T[1]))::Lar.LAR)
+	bigPI = LarA.spaceIndex(model)
 
     # multiprocessing of edge fragmentation
     if (multiproc == true)
@@ -1158,7 +1149,7 @@ function planar_arrangement_1(
             newedges_nums = map(x->x+finalcells_num, collect(1:size(ev, 1)))
             edge_map[i] = newedges_nums
             finalcells_num += size(ev, 1)
-            rV, rEV = Lar.skel_merge(rV, rEV, v, ev)
+            rV, rEV = LAR.skel_merge(rV, rEV, v, ev)
         end
     else
         # sequential (iterative) processing of edge fragmentation
@@ -1168,7 +1159,7 @@ function planar_arrangement_1(
             edge_map[i] = newedges_nums
             finalcells_num += size(ev, 1)
             rV = convert(Lar.Points, rV)
-            rV, rEV = Lar.skel_merge(rV, rEV, v, ev)
+            rV, rEV = LAR.skel_merge(rV, rEV, v, ev)
         end
     end
 
@@ -1229,19 +1220,25 @@ julia> model = Lar.Model([
     0.0 2 0 3 4 4 2 0 0 4 4 2
 ]);
 
-julia> model.T[1] = abs.(Lar.coboundary_0([
+julia> Lar.addModelCells!(model, 1, [
     [ 1,  2], [ 2,  3], [ 3,  1],
     [ 4,  5], [ 5,  6], [ 6,  7], [ 7,  8], [ 8,  9], [ 9, 4],
     [10, 11], [11, 12], [12, 10]
-]))
+])
 
-julia> bicon_comps = Lar.Arrangement.biconnected_components(model.T[1])
+julia> bicon_comps = LarA.biconnected_components(model.T[1])
 3-element Array{Array{Int64,1},1}:
  [9, 8, 7, 6, 5, 4]
  [3, 2, 1]
  [12, 11, 10]
 
-julia> model = Lar.Arrangement.planar_arrangement_2(model, bicon_comps);    ##Add numbering view
+julia> model = Lar.Arrangement.planar_arrangement_2(model, bicon_comps);
+
+julia> Matrix(model.T[2])
+3×12 Array{Int8,2}:
+ -1  -1  -1  -1  -1  1   0   0  0   0   0  0
+  0   0   0   0   0  0  -1  -1  1   0   0  0
+  0   0   0   0   0  0   0   0  0  -1  -1  1
 ```
 """
 function planar_arrangement_2(
