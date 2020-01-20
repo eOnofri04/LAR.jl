@@ -225,3 +225,25 @@ end
 
 
 #TODO check if removing sparse zeros is necessary
+
+
+#-------------------------------------------------------------------------------
+#   MODEL BOUNDING BOXES
+#-------------------------------------------------------------------------------
+
+function getModelBoundingBox(
+		model::Lar.Model,
+		deg::Int
+	)::Array{Array{Float64,2},1}
+
+	function findBBox(pts::Lar.Points)::Tuple{Array{Float64,2},Array{Float64,2}}
+		minimum = mapslices(x->min(x...), pts, dims=2)
+		maximum = mapslices(x->max(x...), pts, dims=2)
+		return minimum, maximum
+	end
+
+	cellpts = [ hcat(Lar.getModelCellVertices(model, deg, c)...)
+				for c = 1 : size(model, deg, 1)
+			  ]
+	return [hcat(findBBox(c)...) for c in cellpts]
+end
