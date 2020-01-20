@@ -77,7 +77,8 @@ module Lar
 	const ChainComplex = Array{ChainOp,1}
 
 	include("./model.jl")
-	include("./arrangement/arrangement.jl");
+	include("./arrangement/arrangement.jl")
+	include("lar2LAR.jl")
 	#include("./interface.jl")
     #include("./utilities.jl")
     #include("./simplexn.jl")

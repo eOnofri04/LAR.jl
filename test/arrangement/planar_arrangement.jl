@@ -529,3 +529,40 @@ end
     @test rearranged_triforce == a
 
 end
+
+#-------------------------------------------------------------------------------
+#   BIG RANDOM DATASETS
+#-------------------------------------------------------------------------------
+
+@testset "Planar Arrangement - Big Random Data" begin
+    npts = 100
+    ndgs = 200
+    V = rand(2, npts)
+    model = Lar.Model(rand(2, npts))
+    cv = unique([rand(1 : npts, 2) for i = 1 : 10*npts])[1 : ndgs*2]
+    cv = [[c[1] c[2]] for c in cv if c[1] != c[2]][1 : ndgs]
+    I = []
+    J = []
+    K = ones(Int8, 2*ndgs)
+    for i = 1 : ndgs
+        push!(J, cv[i]...)
+        push!(I, [i; i]...)
+    end
+    Lar.addModelCells!(model, 1, SparseArrays.sparse(I, J, K, ndgs, npts))
+    model1, edge_map = LarA.planar_arrangement_1(model, spzeros(Int8, 0), true)
+    bicon_comps = LarA.biconnected_components(model1.T[1])
+    edge_map = LarA.remove_mapping_dangling_edges(edge_map, bicon_comps)
+    model2 = LarA.planar_arrangement_2(model1, bicon_comps)
+
+    @testset "Closure of 2-cells" begin
+        for i = 1 : size(model2, 2, 1)
+            edges  = findnz(model2.T[2][i, :])[1]
+            points = abs.(model2.T[1][edges, :])
+            @test sum(points) == 2 * length(edges)
+        end
+    end
+
+    @testset "2-Cell Compactness" begin
+        @test sum(abs.(model2.T[2])) == 2 * size(model2, 2, 2)
+    end
+end
