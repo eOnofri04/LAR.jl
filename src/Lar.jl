@@ -8,6 +8,7 @@ module Lar
 	using LinearAlgebra
 	#using Distributed
 	using LinearAlgebraicRepresentation
+	using LightXML
 
 	LAR = LinearAlgebraicRepresentation
 
@@ -79,6 +80,7 @@ module Lar
 	include("./model.jl")
 	include("./arrangement/arrangement.jl")
 	include("lar2LAR.jl")
+	include("file_extraction.jl")
 	#include("./interface.jl")
     #include("./utilities.jl")
     #include("./simplexn.jl")

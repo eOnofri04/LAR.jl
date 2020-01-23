@@ -19,8 +19,8 @@ function svgarrangement(filename)
 	GL.VIEW( cat(meshes) );
 
 	# final solid visualizations
-	FE = [SparseArrays.findnz(model.T[2][k,:])[1] for k=1:size(model.T[2],1)]
-	FV = [collect(Set(cat([EV[e] for e in FE[f]]))) for f=1:length(FE)]
+	# FE = [SparseArrays.findnz(model.T[2][k,:])[1] for k=1:size(model.T[2],1)]
+	# FV = [collect(Set(cat([EV[e] for e in FE[f]]))) for f=1:length(FE)]
 
 	EVs = Lar.FV2EVs(model)
 	FVs = Lar.triangulate2D(model)

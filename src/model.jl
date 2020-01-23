@@ -1,4 +1,6 @@
 import Base: +, length, size, ==
+import ViewerGL
+GL = ViewerGL
 
 #-------------------------------------------------------------------------------
 #   MODEL STRUCT DEFINITION
@@ -60,16 +62,21 @@ Base.deepcopy(m::Lar.Model) = Lar.Model(Base.deepcopy(m.G), Base.deepcopy(m.T))
 #   GEOMETRY MANIPULATION
 #-------------------------------------------------------------------------------
 
-function addModelVertex!(m::Lar.Model, v::Array{Float64, 1})::Nothing
-    length(V) == length(v) ||
+function addModelVertices!(m::Lar.Model, V::Lar.Points)::Nothing
+    length(m) == size(V, 1) ||
         throw(ArgumentError("Point dimension mismatch."))
-    m.G = [m.G v];
+    m.G = [m.G V];
 
-    if isempty(m.T[1])
-        m.T[1] = SparseArrays.spzeros(size(G, 0, 2), 0)
-        m.T[1] = [m.T[1] SparseArrays.pzeros(Int8, m.T[1].m, 1)]
-    end
+    m.T[1] = SparseArrays.sparse(
+        findnz(m.T[1])...,
+        size(m, 1, 1),
+        size(m, 1, 2) + size(V, 2)
+    )
+    return
+end
 
+function addModelVertex!(m::Lar.Model, v::Array{Float64, 1})::Nothing
+    return addModelVertices!(m, v[:, :])
 end
 
 function deleteModelVertex!(m::Lar.Model, v::Int)::Nothing
@@ -246,20 +253,16 @@ end
 
 function viewModel(model::Lar.Model, exp::Float64 = 1.)
     # visualization of numbered arrangement
-    VV = [[k] for k = 1 : size(model, 0, 2)]
-    EV = LAR.cop2lar(model.T[1]);
-    FE = LAR.cop2lar(model.T[2]);
-    FV = cat([[EV[e] for e in face] for face in FE])
+    #VV = [[k] for k = 1 : size(model, 0, 2)]
+    #EV = LAR.cop2lar(model.T[1]);
+    #FE = LAR.cop2lar(model.T[2]);
+    #FV = cat([[EV[e] for e in face] for face in FE])
 
     # final solid visualization
-    triangulated_faces = LAR.triangulate2D(
-        convert(Lar.Points, model.G'), [model.T[1], model.T[2]]
-    )
-    FVs = convert(Array{Lar.Cells}, triangulated_faces)
+    FVs = Lar.triangulate2D(model)
     GL.VIEW(GL.GLExplode(model.G,FVs,exp,exp,exp,99,1));
 
     # polygonal face boundaries
-    EVs = LAR.FV2EVs(model.T[1], model.T[2])
-    EVs = convert(Array{Array{Array{Int64,1},1},1}, EVs)
-    GL.VIEW(GL.GLExplode(model.G,EVs,exp,exp,exp,1,1));
+    EVs = Lar.FV2EVs(model)
+    GL.VIEW(GL.GLExplode(model.G,EVs,exp,exp,exp,3,1));
 end

@@ -562,6 +562,10 @@ end
         end
     end
 
+    @testset "1-Cell Compactness" begin
+        @test sum(abs.(model2.T[1])) == 2 * size(model, 1, 2)
+    end
+
     @testset "2-Cell Compactness" begin
         @test sum(abs.(model2.T[2])) == 2 * size(model2, 2, 2)
     end

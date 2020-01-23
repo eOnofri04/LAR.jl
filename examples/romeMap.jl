@@ -1,79 +1,66 @@
-using SparseArrays, LightXML, ViewerGL
-GL = ViewerGL
 include("./../src/Lar.jl")
+using SparseArrays, ViewerGL, LinearAlgebraicRepresentation
+LAR = LinearAlgebraicRepresentation
+LarA = Lar.Arrangement
+GL = ViewerGL
 
+#=== LAURENTINA DATASET ===#
+#  pre-crop E, V = 24043×22808
+#  cropped  E, V = 21454×20389
+#  arranged E, V =
+filename = "examples/osm/laurentina.osm"
+filename = "examples/osm/laurentina2.osm"
 
-#=== EXTRACT NODEs AND STREETs FROM OSM FILE ===#
-xdoc  = parse_file("examples/map.osm")
-xroot = root(xdoc)
+#=== MARCONI DATASET ===#
+#  pre-crop V =     ; E =     ; F =   0
+#  cropped  V = 5153; E = 5489; F =   0
+#  arranged V = 4600; E = 5062; F = 838
+#filename = "examples/osm/marconi.osm"
 
-node_list = get_elements_by_tagname(xroot, "node")
-way_list  = get_elements_by_tagname(xroot, "way")
+#=== ALBANO LAZIALE DATASET ===#
+#  pre-crop E, V =
+#  cropped  E, V = 9205×8879
+#  arranged E, V = 9305×8892
+#filename = "examples/osm/albano.osm"
 
-#=== EXTRACT VERTEX SET AND VERTEX POSITION MAP ===#
+model = Lar.osm2lar(filename, true, false)
 
-Vidxs = [parse(Int, attribute(v, "id")) for v in node_list]
-Vmax  = max(Vidxs...)
-Vmap  = SparseArrays.spzeros(Int, Vmax)
-Vnum  = length(Vidxs)
-for i = 1 : Vnum   Vmap[Vidxs[i]] = i   end
+GL.VIEW([GL.GLGrid(model.G, LAR.cop2lar(model.T[1]), GL.COLORS[3])])
 
+model, edge_map = LarA.planar_arrangement(model, spzeros(Int8, 0), true, false)
 
-lats  = [parse(Float64, attribute(v, "lat")) for v in node_list]
-lmin  = min(lats...)
-lmax  = max(lats...)
-lats  = (lats .- lmin) ./ (lmax - lmin)
+GL.VIEW([GL.GLGrid(model.G, LAR.cop2lar(model.T[1]), GL.COLORS[3])])
 
-lons  = [parse(Float64, attribute(v, "lon")) for v in node_list]
-lmin  = min(lons...)
-lmax  = max(lons...)
-lons  = (lons .- lmin) ./ (lmax - lmin)
+FVs = Lar.triangulate2D(model)
+GL.VIEW(GL.GLExplode(model.G,FVs, 1., 1., 1.,99,1));
+GL.VIEW(GL.GLExplode(model.G,FVs,1.2,1.2,1.2,99,1));
 
-#=== BUILD LAR MODEL ===#
+GL.VIEW( GL.GLExplode(
+    model.G,
+    [f for f in FVs if length(f) > 20],
+    1.5, 1.5, 1.5, 99, 1)
+);
 
-model = Lar.Model([lats'; lons'])
-
-for street in way_list
-    nodes = [
-             Vmap[parse(Int, attribute(n, "ref"))]
-             for n in get_elements_by_tagname(street, "nd")
-            ]
-    for i = 1 : length(nodes) - 1
-        newcell = SparseArrays.spzeros(Int8, Vnum)
-        newcell[nodes[  i]] = 1
-        newcell[nodes[i+1]] = 1
-        Lar.addModelCells!(model, 1, convert(Lar.ChainOp, newcell'))
-    end
-end
-
-
-#===
-    extraction of a box of
-     0.31<lats<0.55
-     0.65<lons<0.75
-===#
-
-toDelV = convert(Array{Int64,1},
-    [i  for i = 1 : size(model, 0, 2)
-        if model.G[1, i] < 0.31
-        || model.G[1, i] > 0.35
-        || model.G[2, i] < 0.65
-        || model.G[2,i] > 0.75
-    ]
-)
-Lar.deleteModelVertices!(model, toDelV)
-
-GL.VIEW([GL.GLGrid(model.G, Lar.cop2lar(model.T[1]))])
-
+#==
 
 #=== NOW IT LOOPS ===#
 LarA = Lar.Arrangement
 
-sigma           = spzeros(Int8, 0)
+sigma           = SparseArrays.spzeros(Int8, 0)
 return_edge_map = false
 multiproc       = false
 
-model, edge_map = LarA.planar_arrangement_1(model, sigma, true, multiproc)
+# model, edge_map = LarA.planar_arrangement_1(model, sigma, true, multiproc)
+
+edgenum = size(model, 1, 1)
+edge_map = Array{Array{Int, 1}, 1}(undef,edgenum)
+rV = Lar.Points(zeros(0, 2))
+rEV = SparseArrays.spzeros(Int8, 0, 0)
+finalcells_num = 0
+
+# spaceindex computation
+bigPI = LarA.spaceIndex(model)
+...
 
 bicon_comps = LarA.biconnected_components(model.T[1])
 V           = convert(Lar.Points, model.G')
@@ -109,3 +96,6 @@ EVs[p] = ev
 tokeep = setdiff(1:fe.m, shell_num)
 boundaries[p] = fe[tokeep, :]
 shells[p] = fe[shell_num, :]
+
+
+==#

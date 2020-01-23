@@ -27,4 +27,4 @@ triforce.T[1] = SparseArrays.sparse(Array{Int8, 2}([
 model, sigma, edge_map = LarA.planar_arrangement_1(triforce, σ, true, false)
 cleanedM, cleanedEM = LarA.cleandecomposition(model, sigma, edge_map)
 bicon_comps = Lar.Arrangement.biconnected_components(cleanedM.T[1])
-arrangedM = LarA.planar_arrangement_2(cleanedM, bicon_comps, cleanedEM)
+arrangedM = LarA.planar_arrangement_2(cleanedM, bicon_comps)
