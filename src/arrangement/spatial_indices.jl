@@ -169,9 +169,9 @@ Sigma =  spaceindex(model3d);
 Sigma
 ```
 """
-function spaceIndex(model::Lar.Model)::Array{Array{Int,1},1}
+function spaceIndex(model::Lar.Model, dim::Int)::Array{Array{Int,1},1}
 
-	bboxes = LarA.getModelBoundingBoxes(model, 1)
+	bboxes = LarA.getModelBoundingBoxes(model, dim)
 	# Build Box Coverings for each dimension and intersecting them
 	covers = LarA.extractBoxCovering(bboxes, 1)
 	for d = 2 : length(model)

@@ -951,7 +951,7 @@ function componentgraph(V, copEV, bicon_comps)
     end
     # computation of bounding boxes of isolated components
 	shell_bboxes = []
-	for i in 1:n
+	for i in 1 : n
     	vs_indexes = (abs.(EVs[i]')*abs.(shells[i])).nzind
    		push!(shell_bboxes, LAR.bbox(V[vs_indexes, :]))
 	end
@@ -982,7 +982,7 @@ function cell_merging(
         end
         boxes
     end
-    # initiolization
+    # initialization
     sums = Array{Tuple{Int, Int, Int}}(undef, 0)
     # assembling child components with father components
     for father in 1:n
@@ -1366,6 +1366,10 @@ function planar_arrangement(
 	model = LarA.planar_arrangement_2(model, bicon_comps)
 
     print("PLANAR ARRANGEMENT 2 COMPLETE\n")
+
+    if size(model, 0, 2) - size(model, 1, 1) + size(model, 2, 1) != 1
+        @show size(model, 0, 2) - size(model, 1, 1) + size(model, 2, 1)
+    end
 
 	if return_edge_map
 	     return model, edge_map
