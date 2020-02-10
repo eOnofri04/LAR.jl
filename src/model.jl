@@ -181,7 +181,7 @@ function getModelLoCell(m::Lar.Model, deg::Int, c::Int)::Array{Int, 1}
     return m.T[deg][c, :].nzind
 end
 
-function getModelCellVertices(m::Lar.Model, deg::Int, c::Int)
+function getModelCellVertices(m::Lar.Model, deg::Int, c::Int, ret_idx=false)
     deg > 0 || throw(ArgumentError("Degree must be a non negative value"))
     deg ≤ length(m) || throw(ArgumentError("The model do not have degree $deg"))
     set = [c]
@@ -189,7 +189,24 @@ function getModelCellVertices(m::Lar.Model, deg::Int, c::Int)
         set = ∪([m.T[d][el, :].nzind for el in set]...)
     end
 
+    if ret_idx == true
+        return (map(i -> m.G[:, set[i]], 1:length(set)), set)
+    end
     return map(i -> m.G[:, set[i]], 1:length(set))
+end
+
+function getModelCellGeometry(m::Lar.Model, deg::Int, c::Int, ret_idx=false)
+    deg > 0 || throw(ArgumentError("Degree must be a non negative value"))
+    deg ≤ length(m) || throw(ArgumentError("The model do not have degree $deg"))
+    set = [c]
+    for d = deg : -1 : 1
+        set = ∪([m.T[d][el, :].nzind for el in set]...)
+    end
+
+    if ret_idx == true
+        return (m.G[:, set], set)
+    end
+    return m.G[:, set]
 end
 
 #-------------------------------------------------------------------------------
@@ -283,6 +300,17 @@ function uniteModels(m1::Lar.Model, m2::Lar.Model)::Lar.Model
     return model
 end
 
+function mergeModels!(model::Lar.Model, m2::Lar.Model)::Nothing
+    length(model) == length(m2) ||
+        throw(ArgumentError("ERROR: Inconsistent models dimension!"))
+
+    throw ErrorException("NOT CODED YET")
+end
+
+function mergeMultipleModels(models::Array{Lar.Model,1})::Lar.Model
+
+    throw ErrorException("NOT CODED YET")
+end
 
 #-------------------------------------------------------------------------------
 #   MODEL REPRESENTATION
@@ -312,7 +340,7 @@ function viewModel(model::Lar.Model, depth::Int64 = -1, exp::Float64 = 1.)
     end
 
     if depth == 1
-        if !isempty(model.T[3])
+        if length(model) < 3 || !isempty(model.T[3])
             copCE = abs.(model.T[3]) * abs.(model.T[2]) .!= 0
             comp = [(copCE[c, :]).nzind for c = 1 : size(copCE, 1)]
         elseif !isempty(model.T[2])
@@ -321,12 +349,22 @@ function viewModel(model::Lar.Model, depth::Int64 = -1, exp::Float64 = 1.)
             comp = Lar.Arrangement.biconnected_components(model.T[1])
         end
 
-        mesh = [GL.GLGrid(model.G, LAR.cop2lar(model.T[1][comp[i], :]), GL.COLORS[(i-1)%12+1], 1.) for i = 1 : length(comp)]
+        mesh = [
+            GL.GLGrid(
+                model.G,
+                LAR.cop2lar(model.T[1][comp[i], :]),
+                GL.COLORS[(i-1)%12+1],
+                1.
+            )
+            for i = 1 : length(comp)
+        ]
         GL.VIEW( mesh )
     end
 
     if depth == 2
-        GL.VIEW(  )
+        modelPurge!(model, 1)
+        FVs = Lar.triangulate2D(model)
+        GL.VIEW(GL.GLExplode(model.G,FVs,exp,exp,exp,99,1));
     end
 
     if depth == 3

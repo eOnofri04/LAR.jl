@@ -142,11 +142,11 @@ Boolean ops on such complexes equates the total sum of such numbers.
 # Examples 2D
 
 ```
-julia> V = hcat([[0.,0],[1,0],[1,1],[0,1],[2,1]]...);
+julia> model = Lar.Model(hcat([[0.,0],[1,0],[1,1],[0,1],[2,1]]...));
 
-julia> EV = [[1,2],[2,3],[3,4],[4,1],[1,5]];
+julia> Lar.addModelCells!(model, 1, [[1,2],[2,3],[3,4],[4,1],[1,5]]);
 
-julia> Sigma = Lar.spaceindex((V,EV))
+julia> Sigma = LarA.spaceIndex(model, 1)
 5-element Array{Array{Int64,1},1}:
  [4, 5, 2]
  [1, 3, 5]
@@ -155,18 +155,42 @@ julia> Sigma = Lar.spaceindex((V,EV))
  [4, 1, 3, 2]
 ```
 
-From `model2d` value, available in `?input_collection` docstring:
-
-```julia
-julia> Sigma =  spaceindex(model2d);
-```
-
 # Example 3D
 
 ```julia
-model = model3d
-Sigma =  spaceindex(model3d);
-Sigma
+julia> model = Lar.Model([
+		0.0 1.0 0.0 0.0 0.0 0.0 1.0
+		0.0 0.0 1.0 0.0 0.0 0.0 0.0
+		0.0 0.0 0.0 1.0 2.0 3.0 2.0
+	])
+julia> Lar.addModelCells!(model, 1, [
+		[1,3],[1,2],[2,3],[3,4],[2,4],[1,4],[4,5],[5,7],[6,7],[5,6]
+	])
+julia> Lar.addModelCells!(model, 2,[
+		[1,2,3],[1,4,6],[2,5,6],[3,4,5],[8,9,10]
+	])
+
+julia> LarA.spaceIndex(model, 1)
+10-element Array{Array{Int64,1},1}:
+ [4, 6, 2, 3, 5]
+ [1, 4, 6, 3, 5]
+ [1, 4, 6, 2, 5]
+ [1, 6, 7, 2, 3, 5]
+ [1, 4, 6, 7, 2, 3]
+ [1, 4, 7, 2, 3, 5]
+ [4, 6, 10, 5, 8, 9]
+ [7, 10, 9]
+ [7, 10, 8]
+ [7, 8, 9]
+
+LarA.spaceIndex(model, 2)
+5-element Array{Array{Int64,1},1}:
+ [2, 3, 4]
+ [1, 3, 4]
+ [2, 1, 4]
+ [2, 1, 3]
+ []
+
 ```
 """
 function spaceIndex(model::Lar.Model, dim::Int)::Array{Array{Int,1},1}
