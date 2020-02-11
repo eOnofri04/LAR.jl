@@ -30,6 +30,7 @@ function spatial_arrangement(model::Lar.Model, mt::Bool; err=1e-7)::Lar.Model
 end
 
 function pairwise_decomposition(model::Lar.Model, mt::Bool; err=1e-7)::Lar.Model
+	!mt || throw(ArgumentError("Multicore not Coded!"))
     sp_idx = LarA.spaceIndex(model, 2)
     de_models = [
         LarA.face_decomposition(model, face_idx, sp_idx[face_idx])
@@ -47,7 +48,7 @@ function face_decomposition(#V, EV, FE, sp_idx, sigma)
 	function build_projection_matrix(vs::Lar.Points)::Matrix{Float64}
     	u1 = vs[:, 2] - vs[:, 1]
     	u2 = vs[:, 3] - vs[:, 1]
-    	u3 = cross(u1, u2)
+    	u3 = LAR.cross(u1, u2)
     	T = Matrix{Float64}(LinearAlgebra.I, 4, 4)
     	T[1:3, 4] = - vs[:,1]
     	M = Matrix{Float64}(LinearAlgebra.I, 4, 4)
@@ -122,10 +123,12 @@ function face_decomposition(#V, EV, FE, sp_idx, sigma)
 	# Each other face adds new pieces
 	for f in sp_idx_face
 		newModel = face_intersection(PG, model.T[1], model.T[2][f, :])
-		Lar.mergeModels!(Pmodel, newModel)
+		Lar.uniteModels!(Pmodel, newModel)
 	end
-														#---v ?
-	model = Lar.Arrangement.planar_arrangement(model, sparsevec(ones(Int8, length(Gfaceidx))))
+
+	Pmodel = Lar.mergeModelVertices(Pmodel)
+													#---v ? is needed sigma?
+	model = Lar.Arrangement.planar_arrangement(Pmodel, sparsevec(ones(Int8, length(Gfaceidx))))
 	@assert !isnothing(model) "UNEXPECTED ERROR: a face should be mapped to itself"
 
 	n = size(model, 0, 2)

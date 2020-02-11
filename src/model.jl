@@ -310,7 +310,8 @@ end
 
 function mergeModelVertices(model::Lar.Model; err=1e-6)
     dims = length(model)
-    kdtree = NearestNeighbors.KDTree(model.G)
+    Gfloat = convert(Array{Float64,2}, model.G)
+    kdtree = NearestNeighbors.KDTree(Gfloat)
     todel  = []
     tokeep = []
     I      = [Array{Int, 1}() for i = 1 : dims]
@@ -320,7 +321,7 @@ function mergeModelVertices(model::Lar.Model; err=1e-6)
     # Collide Vertices and update 1-Cochain
     let nidx = 1;  for vidx = 1 : size(model, 0, 2)
         if !(vidx in todel)
-            nearvs = NearestNeighbors.inrange(kdtree, model.G[:, vidx], err)
+            nearvs = NearestNeighbors.inrange(kdtree, Gfloat[:, vidx], err)
             # for d = 1 : dims
             if !isempty(model, 1)
                 newVL = sum(model.T[1][:, nearvs], dims=2)

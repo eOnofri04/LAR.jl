@@ -235,26 +235,27 @@ function merge_vertices!(
         edge_map::Array{Array{Int64,1},1} = Array{Array{Int64,1},1}(),
         err::Float64 = 1e-4
     )::Nothing
-    V = convert(Lar.Points, model.G')
+
+    V = convert(Array{Float64,2}, model.G)
     EV = model.T[1]
     vertsnum = size(V, 1)
     edgenum = size(EV, 1)
     newverts = zeros(Int, vertsnum)
-    kdtree = KDTree(model.G)
+    kdtree = KDTree(V)
 
     # merge congruent vertices
     todelete = []
     i = 1
     for vi in 1:vertsnum
         if !(vi in todelete)
-            nearvs = LAR.inrange(kdtree, V[vi, :], err)
+            nearvs = LAR.inrange(kdtree, V[:, vi], err)
             newverts[nearvs] .= i
             nearvs = setdiff(nearvs, vi)
             todelete = union(todelete, nearvs)
             i = i + 1
         end
     end
-    nV = V[setdiff(collect(1:vertsnum), todelete), :]
+    nV = V[:, setdiff(collect(1:vertsnum), todelete)]
 
     # merge congruent edges
     edges = Array{Tuple{Int, Int}, 1}(undef, edgenum)
@@ -1117,7 +1118,7 @@ function planar_arrangement_1(
 	finalcells_num = 0
 
 	# spaceindex computation
-	bigPI = LarA.spaceIndex(model)
+	bigPI = LarA.spaceIndex(model, 1)
 
     # multiprocessing of edge fragmentation
     if (multiproc == true)

@@ -22,7 +22,7 @@ LAR = LinearAlgebraicRepresentation
         [0 0 0 1 1 0 0] #4->4,5
         [0 0 0 0 0 1 1] #5->6,7
     ])))
-    bigPI = LarA.spaceIndex(model)
+    bigPI = LarA.spaceIndex(model, 1)
 
     @testset "intersect_edges" begin
         V = convert(Lar.Points, model.G')
@@ -582,12 +582,12 @@ end
     end
 
     @testset "Biconnected Components" begin
-        for comp in bicon_comps
-            sum(
-                (sum(abs.(model.T[1][comp, :]), dims=1) .!= 0)
-                + (sum(abs.(model.T[1][setdiff(1:size(model, 1, 1), comp), :]), dims=1) .!= 0)
-                .!= 1
-            ) == 0
-        end
+        # for comp in bicon_comps
+        #     sum(
+        #         (sum(abs.(model.T[1][comp, :]), dims=1) .!= 0)
+        #         + (sum(abs.(model.T[1][setdiff(1:size(model, 1, 1), comp), :]), dims=1) .!= 0)
+        #         .!= 1
+        #     ) == 0
+        # end
     end
 end
