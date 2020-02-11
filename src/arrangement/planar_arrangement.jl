@@ -235,27 +235,28 @@ function merge_vertices!(
         edge_map::Array{Array{Int64,1},1} = Array{Array{Int64,1},1}(),
         err::Float64 = 1e-4
     )::Nothing
-
-    V = convert(Array{Float64,2}, model.G)
+    V = convert(Lar.Points, model.G')
     EV = model.T[1]
     vertsnum = size(V, 1)
     edgenum = size(EV, 1)
     newverts = zeros(Int, vertsnum)
-    kdtree = KDTree(V)
+    # KDTree constructor needs an explicit array of Float64
+    V = Array{Float64,2}(V)
+    kdtree = KDTree(permutedims(V))
 
     # merge congruent vertices
     todelete = []
     i = 1
     for vi in 1:vertsnum
         if !(vi in todelete)
-            nearvs = LAR.inrange(kdtree, V[:, vi], err)
+            nearvs = LAR.inrange(kdtree, V[vi, :], err)
             newverts[nearvs] .= i
             nearvs = setdiff(nearvs, vi)
             todelete = union(todelete, nearvs)
             i = i + 1
         end
     end
-    nV = V[:, setdiff(collect(1:vertsnum), todelete)]
+    nV = V[setdiff(collect(1:vertsnum), todelete), :]
 
     # merge congruent edges
     edges = Array{Tuple{Int, Int}, 1}(undef, edgenum)

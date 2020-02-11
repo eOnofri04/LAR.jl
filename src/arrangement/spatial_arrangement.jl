@@ -36,7 +36,7 @@ function pairwise_decomposition(model::Lar.Model, mt::Bool; err=1e-7)::Lar.Model
         LarA.face_decomposition(model, face_idx, sp_idx[face_idx])
         for face_idx = 1 : size(model, 2, 1)
     ]
-    return Lar.mergeMultipleModels(de_models, true, err)
+    return Lar.mergeMultipleModels(de_models, err=err)
 end
 
 function face_decomposition(#V, EV, FE, sp_idx, sigma)
@@ -132,8 +132,10 @@ function face_decomposition(#V, EV, FE, sp_idx, sigma)
 	@assert !isnothing(model) "UNEXPECTED ERROR: a face should be mapped to itself"
 
 	n = size(model, 0, 2)
-	retModel = Lar.Model((inv(M)*[model.G; zeros(1, n); ones(1, n)])[1:3, 1])
-	retModel.T = model.T														# <-- Unsafe
+	retModel = Lar.Model((inv(M)*[model.G; zeros(1, n); ones(1, n)])[1:3, :])
+	Lar.addModelCells!(retModel, 1, model.T[1])
+	Lar.addModelCells!(retModel, 2, model.T[2])
+
 	return retModel
 end
 

@@ -148,6 +148,7 @@ end
 
 
 function deleteModelCells!(m::Lar.Model, deg::Int, cs::Array{Int, 1})::Nothing
+    !isempty(cs) || return
     deg > 0 || throw(ArgumentError("Degree must be a non negative value"))
     deg ≤ length(m) || throw(ArgumentError("The model do not have degree $deg"))
     !isempty(m.T[deg]) ||
@@ -301,11 +302,15 @@ function uniteModels(m1::Lar.Model, m2::Lar.Model)::Lar.Model
     return model
 end
 
-function mergeMultipleModels(models::Array{Lar.Model,1})::Lar.Model
+function mergeMultipleModels(models::Array{Lar.Model,1}; err=1e-6)::Lar.Model
 
-    #throw ErrorException("NOT CODED YET")
+    model = models[1];
 
-    return Model()
+    for i = 2 : length(models)
+        Lar.uniteModels!(model, models[i])
+    end
+
+    return Lar.mergeModelVertices(model, err=err)
 end
 
 function mergeModelVertices(model::Lar.Model; err=1e-6)
@@ -333,7 +338,7 @@ function mergeModelVertices(model::Lar.Model; err=1e-6)
             end
             # end
             nidx = nidx + 1
-            push!(todel, setdiff(nearvs, vidx)[1])
+            push!(todel, setdiff(nearvs, vidx)...)
             push!(tokeep, vidx)
         end
     end  end
