@@ -1,6 +1,6 @@
 module Lar
 
-	#using NearestNeighbors
+	using NearestNeighbors
 	using DataStructures
 	using IntervalTrees
 	#using Triangle

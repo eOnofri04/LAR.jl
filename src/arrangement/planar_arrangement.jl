@@ -240,9 +240,7 @@ function merge_vertices!(
     vertsnum = size(V, 1)
     edgenum = size(EV, 1)
     newverts = zeros(Int, vertsnum)
-    # KDTree constructor needs an explicit array of Float64
-    V = Array{Float64,2}(V)
-    kdtree = KDTree(permutedims(V))
+    kdtree = KDTree(model.G)
 
     # merge congruent vertices
     todelete = []

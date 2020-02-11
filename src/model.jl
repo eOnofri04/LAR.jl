@@ -1,4 +1,4 @@
-import Base: +, length, size, ==
+import Base: +, length, size, ==, isempty
 import ViewerGL
 GL = ViewerGL
 
@@ -50,6 +50,7 @@ size(m::Lar.Model)		           = size(m.G)
 size(m::Lar.Model, i::Int)         = i == 0 ? size(m.G   ) : size(m.T[i]   )
 size(m::Lar.Model, i::Int, j::Int) = i == 0 ? size(m.G, j) : size(m.T[i], j)
 ==(m1::Lar.Model, m2::Lar.Model)   = m1.G == m2.G && m1.T == m2.T
+isempty(m::Lar.Model, d::Int)      = isempty(m.T[d])
 
 #-------------------------------------------------------------------------------
 #   OTHER BASE REIMPLEMENTATIONS
@@ -300,16 +301,93 @@ function uniteModels(m1::Lar.Model, m2::Lar.Model)::Lar.Model
     return model
 end
 
-function mergeModels!(model::Lar.Model, m2::Lar.Model)::Nothing
-    length(model) == length(m2) ||
-        throw(ArgumentError("ERROR: Inconsistent models dimension!"))
-
-    throw ErrorException("NOT CODED YET")
-end
-
 function mergeMultipleModels(models::Array{Lar.Model,1})::Lar.Model
 
-    throw ErrorException("NOT CODED YET")
+    #throw ErrorException("NOT CODED YET")
+
+    return Model()
+end
+
+function mergeModelVertices(model::Lar.Model; err=1e-6)
+    dims = length(model)
+    kdtree = NearestNeighbors.KDTree(model.G)
+    todel  = []
+    tokeep = []
+    I      = [Array{Int, 1}() for i = 1 : dims]
+    J      = [Array{Int, 1}() for i = 1 : dims]
+    K      = [Array{Int8,1}() for i = 1 : dims]
+
+    # Collide Vertices and update 1-Cochain
+    let nidx = 1;  for vidx = 1 : size(model, 0, 2)
+        if !(vidx in todel)
+            nearvs = NearestNeighbors.inrange(kdtree, model.G[:, vidx], err)
+            # for d = 1 : dims
+            if !isempty(model, 1)
+                newVL = sum(model.T[1][:, nearvs], dims=2)
+                for i = 1 : length(newVL)  if abs(newVL[i]) == 1
+                    push!(I[1], i)
+                    push!(J[1], nidx)
+                    push!(K[1], newVL[i])
+                end  end
+            end
+            # end
+            nidx = nidx + 1
+            push!(todel, setdiff(nearvs, vidx)[1])
+            push!(tokeep, vidx)
+        end
+    end  end
+
+    # Copy Upper Degree Topology
+    for d = 2 : dims
+        (I[d], J[d], K[d]) = findnz(model.T[d])
+    end
+
+    # Collide Topology                                                          #TODO check
+    for d = 1 : dims  if !isempty(I[d])
+        # Define compact indices for `d` dimension
+        In    = Array{Int, 1}()
+        Jn    = Array{Int, 1}()
+        Kn    = Array{Int8,1}()
+        nrows = max(I[d]...)
+        todel = []
+        let newrow = 1;  for i = 1 : nrows  if !(i in todel)
+            # set new row values if the `i`-th row is unexplored
+            push!(In, ones(Int, sum(I[d].==i))*newrow...)
+            push!(Jn, J[d][I[d].==i]...)
+            push!(Kn, K[d][I[d].==i]...)
+            # coherently update columns index of HO cochain
+            if d < dims  J[d+1][J[d+1].==i] .= newrow  end
+
+            for j = i+1 : nrows
+                if sort(J[d][I[d].==i]) == sort(J[d][I[d].==j])
+                    # coherently update columns index of HO cochain
+                    if d < dims  J[d+1][J[d+1].==j] .= newrow  end
+                    push!(todel, j)
+                end
+            end
+            # update row index for In
+            newrow = newrow + 1
+        end  end  end
+
+        # update cochain with compact matrix
+        I[d] = In
+        J[d] = Jn
+        K[d] = Kn
+    end  end
+
+    sizes = zeros(2, dims)
+    sizes[1,1] = max(I[1]...)
+    sizes[2,1] = length(tokeep)
+    for d = 2 : dims
+        sizes[:,d] = [isempty(I[d]) ? 0 : max(I[d]...); sizes[1, d-1]]
+    end
+    model = Lar.Model(
+        model.G[:, tokeep],
+        [
+            SparseArrays.sparse(I[d], J[d], K[d], sizes[1,d], sizes[2,d])
+            for d = 1 : dims
+        ]
+    )
 end
 
 #-------------------------------------------------------------------------------
