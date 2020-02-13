@@ -122,6 +122,7 @@ function face_decomposition(#V, EV, FE, sp_idx, sigma)
 
 	# Each other face adds new pieces
 	for f in sp_idx_face
+		println("Intersecting $face_idx with $f")
 		newModel = face_intersection(PG, model.T[1], model.T[2][f, :])
 		Lar.uniteModels!(Pmodel, newModel)
 	end

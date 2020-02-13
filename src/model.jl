@@ -345,55 +345,56 @@ function mergeModelVertices(model::Lar.Model; err=1e-6)
 
     # Copy Upper Degree Topology
     for d = 2 : dims
-        (I[d], J[d], K[d]) = findnz(model.T[d])
+        (I[d], J[d], K[d]) = SparseArrays.findnz(model.T[d])
     end
+
+    model = Lar.Model(model.G[:, tokeep])
+
 
     # Collide Topology                                                          #TODO check
-    for d = 1 : dims  if !isempty(I[d])
+    let lolength = length(tokeep);  for d = 1 : dims  if !isempty(I[d])
         # Define compact indices for `d` dimension
-        In    = Array{Int, 1}()
-        Jn    = Array{Int, 1}()
-        Kn    = Array{Int8,1}()
-        nrows = max(I[d]...)
-        todel = []
-        let newrow = 1;  for i = 1 : nrows  if !(i in todel)
-            # set new row values if the `i`-th row is unexplored
-            push!(In, ones(Int, sum(I[d].==i))*newrow...)
-            push!(Jn, J[d][I[d].==i]...)
-            push!(Kn, K[d][I[d].==i]...)
-            # coherently update columns index of HO cochain
-            if d < dims  J[d+1][J[d+1].==i] .= newrow  end
 
-            for j = i+1 : nrows
-                if sort(J[d][I[d].==i]) == sort(J[d][I[d].==j])
-                    # coherently update columns index of HO cochain
-                    if d < dims  J[d+1][J[d+1].==j] .= newrow  end
-                    push!(todel, j)
-                end
-            end
-            # update row index for In
-            newrow = newrow + 1
+        # Recostructiong Topology of degree `d`
+        Td = SparseArrays.sparse(I[d], J[d], K[d], max(I[d]...), lolength)
+        # Convert Topology to Array of Arrays
+        aaT = [SparseArrays.findnz(Td[row, :])[1] for row = 1 : size(Td, 1)]
+        nEl = length(aaT)
+        # Find new Topology as array of arrays
+        newT = sort(unique(aaT))
+        # get the indices of the ordered topology
+        ordT = sortperm([aaT; newT])
+        # building the new Topology as SparseMatrix
+        In = Array{Int , 1}()
+        Jn = Array{Int , 1}()
+        Kn = Array{Int8, 1}()
+        let newidx = 1;  for eidx = 1 : length(ordT)  if newidx == 1 || ordT[eidx] < ordT[eidx-1]
+            #                            v---co_edge------
+            Je, Ke = SparseArrays.findnz(Td[ordT[eidx], :])
+            push!(In, (ones(Int, length(Je)) * newidx)...)
+            push!(Jn, Je...)
+            push!(Kn, Ke...)
+            newidx = newidx+1
         end  end  end
+        Tn = SparseArrays.sparse(In, Jn, Kn, length(newT), lolength)
+        # building the map originalEdge -> (collidedEdge, orientation)
+        perm = [(0, 0) for i = 1 : nEl]
+        let newidx = 1;  for e in ordT
+            e <= nEl ? perm[e] = (newidx, Td[e, :] == Tn[newidx, :] ? 1 : -1) : newidx = newidx + 1
+        end  end
 
-        # update cochain with compact matrix
-        I[d] = In
-        J[d] = Jn
-        K[d] = Kn
-    end  end
+        # updating HO topology indices
+        for i = 1 : length(J[d+1])
+            J[d+1][i], K[d+1][i] = perm[J[d+1][i]] .* (1, K[d+1][i])
+        end
 
-    sizes = zeros(2, dims)
-    sizes[1,1] = max(I[1]...)
-    sizes[2,1] = length(tokeep)
-    for d = 2 : dims
-        sizes[:,d] = [isempty(I[d]) ? 0 : max(I[d]...); sizes[1, d-1]]
-    end
-    model = Lar.Model(
-        model.G[:, tokeep],
-        [
-            SparseArrays.sparse(I[d], J[d], K[d], sizes[1,d], sizes[2,d])
-            for d = 1 : dims
-        ]
-    )
+        # setting the new topology in the model
+        Lar.addModelCells!(model, d, Tn);
+
+        # getting the next dimension topology correct size
+        lolength = size(model, d, 1)
+    end  end  end
+    return model
 end
 
 #-------------------------------------------------------------------------------
@@ -446,6 +447,7 @@ function viewModel(model::Lar.Model, depth::Int64 = -1, exp::Float64 = 1.)
     end
 
     if depth == 2
+        model = deepcopy(model)
         modelPurge!(model, 1)
         FVs = Lar.triangulate2D(model)
         GL.VIEW(GL.GLExplode(model.G,FVs,exp,exp,exp,99,1));
