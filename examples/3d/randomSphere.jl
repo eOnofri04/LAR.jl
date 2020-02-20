@@ -1,6 +1,7 @@
 @using LinearAlgebraicRepresentation as LAR
-@using LinearAlgebra as LA
+#@using LinearAlgebra as LA
 @using ViewerGL as GL
+using SparseArrays
 include("../../src/Lar.jl")
 LarA = Lar.Arrangement
 
@@ -46,14 +47,14 @@ function getGFVModel(V::Lar.Points, FV::Array{Array{Int,1}})::Lar.Model
 end
 
 scaling = 1.2
-no_sphere = 4
+no_sphere = 40
 expl = 2.0
 
 carry = Array{Tuple{Array{Float64,2},Array{Array{Int64,1},1}}}(undef, no_sphere)
 for i = 1 : no_sphere
 	carry[i] = LAR.struct2lar(LAR.Struct([
 		LAR.t(rand(0.5:1e-2:5, 3)...),
-		LAR.sphere(rand(1:1e-2:3) * scaling)()
+		LAR.sphere(rand(1:1e-2:3) * scaling)([2,3])
 	]))
 end
 V, FV = LAR.struct2lar(LAR.Struct(carry))
@@ -72,14 +73,29 @@ de_models = [
 	for face_idx = 1 : size(m, 2, 1)
 ]
 
-m = deepcopy(de_models[1])
-for i = 2 : length(de_models)
-	Lar.uniteModels!(m, de_models[i])
-end
+mfrag = Lar.mergeMultipleModels(de_models)
 
-triangulated_faces = LAR.triangulate2D(convert(Lar.Points, m.G'), m.T[1:2])
+triangulated_faces = LAR.triangulate2D(convert(Lar.Points, mfrag.G'), mfrag.T[1:2])
 FVs = convert(Array{Lar.Cells}, triangulated_faces);
-GL.VIEW( GL.GLExplode(m.G,FVs,expl,expl,expl,99,1) );
+GL.VIEW( GL.GLExplode(mfrag.G,FVs,expl,expl,expl,99,1) );
+
+mArranged = Lar.deepcopy(mfrag)
+Lar.addModelCells!(mArranged, 3, LAR.Arrangement.minimal_3cycles(
+		convert(Lar.Points, mfrag.G'), mfrag.T[1], mfrag.T[2])
+	)
+
+
+
+
+V,CVs,FVs,EVs = LAR.pols2tria(mArranged.G, mArranged.T[1], mArranged.T[2], mArranged.T[3])
+
+GL.VIEW(GL.GLExplode(V,FVs,1.5,1.5,1.5,99,1));
+GL.VIEW(GL.GLExplode(V,EVs,1.5,1.5,1.5,99,1));
+meshes = GL.GLExplode(V,CVs[1:end],8,4,6,99,0.5);
+push!( meshes, GL.GLFrame)
+GL.VIEW( meshes );
+
+
 
 #-------------------------------------------------------------------------------
 #

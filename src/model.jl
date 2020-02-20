@@ -304,7 +304,7 @@ end
 
 function mergeMultipleModels(models::Array{Lar.Model,1}; err=1e-6)::Lar.Model
 
-    model = models[1];
+    model = deepcopy(models[1]);
 
     for i = 2 : length(models)
         Lar.uniteModels!(model, models[i])
@@ -313,6 +313,99 @@ function mergeMultipleModels(models::Array{Lar.Model,1}; err=1e-6)::Lar.Model
     return Lar.mergeModelVertices(model, err=err)
 end
 
+function mergeModelVertices(model::Lar.Model; err=1e-4)
+    V = convert(Lar.Points, model.G')
+    EV = model.T[1]
+    FE = model.T[2]
+    vertsnum = size(V, 1)
+    edgenum = size(EV, 1)
+    facenum = size(FE, 1)
+    newverts = zeros(Int, vertsnum)
+    # KDTree constructor needs an explicit array of Float64
+    V = Array{Float64,2}(V)
+    W = convert(Lar.Points, LinearAlgebra.transpose(V))
+    kdtree = KDTree(W)
+	# remove vertices congruent to a single representative
+    todelete = []
+    i = 1
+    for vi in 1:vertsnum
+        if !(vi in todelete)
+            nearvs = Lar.inrange(kdtree, V[vi, :], err)
+            newverts[nearvs] .= i
+            nearvs = setdiff(nearvs, vi)
+            todelete = union(todelete, nearvs)
+            i = i + 1
+        end
+    end
+    nV = V[setdiff(collect(1:vertsnum), todelete), :]
+
+    # translate edges to take congruence into account
+    edges = Array{Tuple{Int, Int}, 1}(undef, edgenum)
+    oedges = Array{Tuple{Int, Int}, 1}(undef, edgenum)
+    for ei in 1:edgenum
+        v1, v2 = EV[ei, :].nzind
+        edges[ei] = Tuple{Int, Int}(sort([newverts[v1], newverts[v2]]))
+        oedges[ei] = Tuple{Int, Int}(sort([v1, v2]))
+    end
+    nedges = union(edges)
+    # remove edges of zero length
+    nedges = filter(t->t[1]!=t[2], nedges)
+    nedgenum = length(nedges)
+    nEV = spzeros(Int8, nedgenum, size(nV, 1))
+
+    etuple2idx = Dict{Tuple{Int, Int}, Int}()
+    for ei in 1:nedgenum
+    	begin
+        	nEV[ei, collect(nedges[ei])] .= 1
+        	nEV
+        end
+        etuple2idx[nedges[ei]] = ei
+    end
+    for e in 1:nedgenum
+    	v1,v2 = findnz(nEV[e,:])[1]
+    	nEV[e,v1] = -1; nEV[e,v2] = 1
+    end
+
+    # compute new faces to take congruence into account
+    faces = [[
+        map(x->newverts[x], FE[fi, ei] > 0 ? oedges[ei] : reverse(oedges[ei]))
+        for ei in FE[fi, :].nzind
+    ] for fi in 1:facenum]
+
+
+    visited = []
+    function filter_fn(face)
+
+        verts = []
+        map(e->verts = union(verts, collect(e)), face)
+        verts = Set(verts)
+
+        if !(verts in visited)
+            push!(visited, verts)
+            return true
+        end
+        return false
+    end
+
+    nfaces = filter(filter_fn, faces)
+
+    nfacenum = length(nfaces)
+    nFE = spzeros(Int8, nfacenum, size(nEV, 1))
+
+    for fi in 1:nfacenum
+        for edge in nfaces[fi]
+            ei = etuple2idx[Tuple{Int, Int}(sort(collect(edge)))]
+            nFE[fi, ei] = sign(edge[2] - edge[1])
+        end
+    end
+
+    model = Lar.Model(convert(Lar.Points, nV'))
+    Lar.addModelCells!(model, 1, nEV)
+    Lar.addModelCells!(model, 2, nFE)
+    return model
+end
+
+#=
 function mergeModelVertices(model::Lar.Model; err=1e-6)
     dims = length(model)
     Gfloat = convert(Array{Float64,2}, model.G)
@@ -329,6 +422,7 @@ function mergeModelVertices(model::Lar.Model; err=1e-6)
             nearvs = NearestNeighbors.inrange(kdtree, Gfloat[:, vidx], err)
             # for d = 1 : dims
             if !isempty(model, 1)
+                # @assert sum(sum(abs.(model.T[1][:, nearvs]), dims=2).>1) == 0 "IMPRECISION"
                 newVL = sum(model.T[1][:, nearvs], dims=2)
                 for i = 1 : length(newVL)  if abs(newVL[i]) == 1
                     push!(I[1], i)
@@ -394,28 +488,41 @@ function mergeModelVertices(model::Lar.Model; err=1e-6)
         # getting the next dimension topology correct size
         lolength = size(model, d, 1)
     end  end  end
+
+    # Last checks
+    for d = 1 : length(model)
+        todel = Array{Int, 1}()
+        for i = 1 : size(model, d, 1)
+            if sum(abs.(model.T[d][i, :])) <= d
+                push!(todel, i)
+            end
+        end
+        Lar.deleteModelCells!(model, d, todel)
+    end
+
     return model
 end
+=#
 
 #-------------------------------------------------------------------------------
 #   MODEL REPRESENTATION
 #-------------------------------------------------------------------------------
 
-# function viewModel(model::Lar.Model, exp::Float64 = 1.)
-#     # visualization of numbered arrangement
-#     #VV = [[k] for k = 1 : size(model, 0, 2)]
-#     #EV = LAR.cop2lar(model.T[1]);
-#     #FE = LAR.cop2lar(model.T[2]);
-#     #FV = cat([[EV[e] for e in face] for face in FE])
-#
-#     # final solid visualization
-#     FVs = Lar.triangulate2D(model)
-#     GL.VIEW(GL.GLExplode(model.G,FVs,exp,exp,exp,99,1));
-#
-#     # polygonal face boundaries
-#     EVs = Lar.FV2EVs(model)
-#     GL.VIEW(GL.GLExplode(model.G,EVs,exp,exp,exp,3,1));
-# end
+function view2DModel(model::Lar.Model, exp::Float64 = 1.)
+    # visualization of numbered arrangement
+    #VV = [[k] for k = 1 : size(model, 0, 2)]
+    #EV = LAR.cop2lar(model.T[1]);
+    #FE = LAR.cop2lar(model.T[2]);
+    #FV = cat([[EV[e] for e in face] for face in FE])
+
+    # final solid visualization
+    FVs = Lar.triangulate2D(model)
+    GL.VIEW(GL.GLExplode(model.G,FVs,exp,exp,exp,99,1));
+
+    # polygonal face boundaries
+    EVs = Lar.FV2EVs(model)
+    GL.VIEW(GL.GLExplode(model.G,EVs,exp,exp,exp,3,1));
+end
 
 function viewModel(model::Lar.Model, depth::Int64 = -1, exp::Float64 = 1.)
     if depth == -1  depth = length(model)  end

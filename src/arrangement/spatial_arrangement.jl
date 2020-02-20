@@ -22,14 +22,23 @@ using DataStructures
 #    colleclt_output
 #-------------------------------------------------------------------------------
 
-function spatial_arrangement(model::Lar.Model, mt::Bool; err=1e-7)::Lar.Model
+function spatial_arrangement(
+		model::Lar.Model,
+		mt::Bool = false;
+		err=1e-7
+	)::Lar.Model
     model = Lar.Arrangement.pairwise_decomposition(model, mt, err = err);
     bicon_comps = LarA.biconnected_components(model.T[1]);
     ##arr_models = [purgeHoles(TGW(...)) for bicon in bicon_comps] # via spaceIndex(model, 3)
     Lar.mergeMultipleModels(arr_models, true, err)
 end
 
-function pairwise_decomposition(model::Lar.Model, mt::Bool; err=1e-7)::Lar.Model
+function pairwise_decomposition(
+		model::Lar.Model,
+		mt::Bool = false;
+		err=1e-7
+	)::Lar.Model
+
 	!mt || throw(ArgumentError("Multicore not Coded!"))
     sp_idx = LarA.spaceIndex(model, 2)
     de_models = [
